@@ -65,11 +65,14 @@ Copy [.env.example](.env.example) to `.env` at the repo root and fill in:
 | Key | With it | Without it |
 | --- | --- | --- |
 | `ELEVENLABS_API_KEY` + `ELEVENLABS_AGENT_ID` | The brain is a live ElevenLabs agent (Claude Sonnet 5.5 inside, Thai voice and speech to text). It changes the screen only through client tools: it opens scenes, draws new pages and decides when to speak first | Keywords pick the screen, a to-do request gets one ready-made page, simple rules decide when to speak first |
+| `ELEVENLABS_API_KEYS` | Several teammates' ElevenLabs keys, comma separated, used in order; one out of credit is skipped for the day (see [Add an ElevenLabs account](#add-an-elevenlabs-account)) | The single `ELEVENLABS_API_KEY` account only |
 | `TAVILY_API_KEY` | The agent gets a `web_search` tool (Tavily, free tier, basic search). Results go on a generated page with source links | There is no search tool. Nothing else changes |
 | `UPSTASH_REDIS_REST_URL` + `_TOKEN` | The daily limit is shared by every Vercel function instance (free Upstash Redis) | The limit is counted in memory: exact locally, best effort on Vercel |
 
-Then run `cd web && npm run agent:sync` once. It creates the agent from
-code and writes its id to `.env`. Run `npm start` again.
+Then run `cd web && npm run agent:sync` once. It creates the agents from
+code (the live agent and the page writer), or updates them, in every
+account. The server finds them by their names.
+Run `npm start` again.
 
 ## How it works
 
@@ -98,8 +101,14 @@ flowchart LR
   keep a page, or search the web.
 - **Generated pages**: the agent describes a page as JSON built only from
   fixed components (text, checklist, chart, steps, call button, source
-  links, …). The browser draws it with `textContent` only. Code written by
-  the model never runs.
+  links, …). The browser draws it with `textContent` only. With the agent's
+  design brief, a second, text-only ElevenLabs agent, the page writer
+  (`POST /api/page`, from the server), then writes the page as free HTML,
+  which replaces the block page as it is written. Each page spends
+  ElevenLabs credit, from the same accounts as the live agent.
+  Model HTML is sanitized before it is shown (no scripts, `on*` attributes,
+  `javascript:` URLs, forms, iframes or outside loads except pictures), then
+  shown in a shadow root. Scripts written by the model never run.
 - **Server** (`web/server.js` locally, `web/api/` on Vercel): signed URL,
   text to speech, web search, the offline keyword router and the run log.
   Every route that spends credit checks the daily usage limit first.
@@ -135,7 +144,10 @@ No real money, mail or bookings. Everything below is demo data in
 - the feed events that make the agent speak first
 
 The web search results are real. The agent's answers are live when it runs
-with keys. Saved pages stay in your own browser (`localStorage`).
+with keys. Saved pages stay in your own browser (`localStorage`). So does
+what the agent remembers about you (name, likes, last task) and what it
+learned from how you use it (for example "todo pages: give items due dates").
+Open the site with `?forget=1` to start clean.
 
 ---
 
@@ -156,8 +168,10 @@ npm run agent:sync -- --dry-run   # show what would be sent
 npm run agent:sync
 ```
 
-The agent in `.env` is the one judges use. To try an agent change first, sync a
-test agent of your own. It gets new tools too, and its ids go to that file, never to `.env`:
+The agent named `Agent OS (U-Hackathon 2026)` is the one judges use. To try an
+agent change first, sync a test agent of your own (in the first account). It gets
+new tools too, and its ids go to that file, never to `.env`. `ELEVENLABS_AGENT_ID`
+pins it only with the single `ELEVENLABS_API_KEY`, not with `ELEVENLABS_API_KEYS`:
 
 ```text
 npm run agent:sync -- --env ../.env.test-agent       # creates it the first time
@@ -187,9 +201,7 @@ needed. One-time steps for the captain:
 3. Set the env vars for Production. Each command asks for the value:
 
    ```text
-   npx vercel env add ELEVENLABS_API_KEY production
-   npx vercel env add ELEVENLABS_AGENT_ID production
-   npx vercel env add ELEVENLABS_TOOL_IDS production
+   npx vercel env add ELEVENLABS_API_KEYS production
    npx vercel env add TAVILY_API_KEY production
    ```
 
@@ -198,6 +210,24 @@ needed. One-time steps for the captain:
    Marketplace. It sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`. Change
    the limits with the `USAGE_*` variables in `.env.example`.
 4. Deploy: `npx vercel --prod`.
+
+### Add an ElevenLabs account
+
+Each teammate's own account adds credit. To add one, put the key (it needs
+the Agents permission) in the production list and redeploy, in `web/`:
+
+```text
+npx vercel env rm ELEVENLABS_API_KEYS production --yes
+npx vercel env add ELEVENLABS_API_KEYS production   # paste every key, comma separated
+npx vercel --prod
+```
+
+The production build runs `agent-sync --auto`: it finds the agents named
+`Agent OS (U-Hackathon 2026)` and `Agent OS page writer` in each account,
+creates each one (the live agent with its tools) if it is missing, and
+updates it otherwise. Preview and local builds never sync. A failing
+account is a warning with its key masked, never a failed deploy. The
+server finds each key's agents by the same names.
 
 On Vercel, the run log goes to the function log: Vercel dashboard > the
 project > Logs. Search for `[runlog]`.

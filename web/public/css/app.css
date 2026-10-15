@@ -15,6 +15,39 @@
 }
 
 * { box-sizing: border-box; }
+.secretary-shortcuts { width: 100%; margin: 4px 0 8px; }
+.secretary-actions, .secretary-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.secretary-button { min-height: 44px; padding: 10px 14px; border: 1px solid #d7c5ae; border-radius: 14px; background: var(--card); color: var(--ink); font: inherit; cursor: pointer; }
+.secretary-button:hover { background: var(--cream-2); }
+.secretary-button:focus-visible, .secretary-demo select:focus-visible, .scene-secretary textarea:focus-visible { outline: 3px solid #bb482c; outline-offset: 3px; }
+.secretary-button:disabled { opacity: .65; cursor: default; }
+.secretary-shortcuts .secretary-button { flex: 1; font-size: 13px; padding: 10px 8px; }
+.secretary-note { color: var(--ink-2); font-size: 13px; line-height: 1.6; margin: 10px 0; }
+.scene-secretary { overflow-wrap: anywhere; }
+.secretary-badge { display: inline-block; border: 1px solid #d7c5ae; border-radius: 20px; padding: 6px 10px; font-size: 12px; margin: 0; }
+.secretary-title { font-size: clamp(25px, 7vw, 32px); margin: 14px 0; }
+.secretary-tabs { margin-bottom: 18px; }
+.secretary-tabs [aria-current="page"] { background: var(--ink); color: var(--card); }
+.secretary-card { background: var(--card); border: 1px solid #e5d8c5; border-radius: 20px; padding: 18px; margin: 14px 0; }
+.secretary-card h2 { font-size: 18px; margin: 0 0 12px; }
+.secretary-card p { line-height: 1.7; }
+.secretary-summary { color: var(--ink-2); line-height: 1.6; }
+.secretary-task { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 48px; font-size: 14px; }
+.secretary-task input { width: 20px; height: 20px; accent-color: var(--ok); }
+.secretary-task time { font-size: 12px; color: var(--ink-2); }
+.task-done { text-decoration: line-through; color: var(--ink-2); }
+.secretary-event { display: grid; gap: 4px; padding: 12px 0; border-top: 1px solid #e5d8c5; }
+.secretary-event time { font-size: 13px; color: var(--ink-2); }
+.secretary-conflict { background: #fff0e9; color: #973b24; border-radius: 12px; padding: 12px; }
+.secretary-free { color: #186e4b; font-weight: 600; }
+.secretary-draft-label { display: grid; gap: 10px; margin-bottom: 16px; }
+.scene-secretary textarea { width: 100%; min-width: 0; resize: vertical; border: 1px solid #d7c5ae; border-radius: 12px; padding: 12px; font: inherit; line-height: 1.7; background: white; color: var(--ink); user-select: text; }
+.secretary-demo { width: min(390px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; border: 1px solid #d7c5ae; border-radius: 24px; padding: 24px; background: var(--cream); color: var(--ink); }
+.secretary-demo::backdrop { background: rgb(30 23 18 / 60%); }
+.secretary-demo h2 { font-size: 23px; margin-top: 0; }
+.secretary-demo label { display: grid; gap: 8px; margin: 16px 0; }
+.secretary-demo select { width: 100%; min-height: 44px; font: inherit; padding: 10px; border: 1px solid #d7c5ae; border-radius: 12px; background: var(--card); color: var(--ink); }
+.secretary-demo > button { width: 100%; margin-top: 8px; }
 [hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
 body {
@@ -32,6 +65,7 @@ body.test *, body.test *::before, body.test *::after { animation-duration: 40ms 
 /* Phone frame on a laptop; full screen on a phone. */
 .phone {
   position: relative;
+  display: flex; flex-direction: column;
   width: 390px;
   height: 844px;
   max-height: 100vh;
@@ -40,36 +74,42 @@ body.test *, body.test *::before, body.test *::after { animation-duration: 40ms 
   background: radial-gradient(120% 70% at 50% 35%, #fffaf2 0%, var(--cream) 55%, var(--cream-2) 100%);
   box-shadow: 0 0 0 12px #0d0b0a, 0 30px 80px rgba(0, 0, 0, .5);
 }
-@media (max-width: 500px) {
+@media (max-width: 500px), (max-height: 500px) {
   body { background: var(--cream); }
   .phone { width: 100vw; height: 100dvh; max-height: none; border-radius: 0; box-shadow: none; }
 }
 
 .statusbar {
-  position: absolute; inset: 0 0 auto 0; z-index: 40;
+  position: relative; flex: none; z-index: 40;
   display: flex; justify-content: space-between;
-  padding: 16px 30px 0; font-size: 15px; font-weight: 600;
+  padding: max(16px, env(safe-area-inset-top)) 24px 12px; font-size: 15px; font-weight: 600;
   pointer-events: none;
 }
 .status-icons { letter-spacing: 1px; font-size: 12px; }
 
 /* ---------- Agent home ---------- */
+.workspace { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 .home {
   height: 100%;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 60px 24px 40px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 12px 20px 24px; overflow-y: auto; overscroll-behavior: contain;
 }
-.mascot-wrap { width: 230px; height: 230px; margin-top: -170px; display: grid; place-items: center; transition: transform var(--grow) ease; }
+.home > * { flex-shrink: 0; }
+.mascot-wrap { width: clamp(96px, 20dvh, 180px); aspect-ratio: 1; margin: 4px auto 0; display: grid; place-items: center; transition: transform var(--grow) ease; }
+.phone:has(.subtitle.show) .mascot-wrap { width: clamp(88px, 16dvh, 140px); }
 .mascot { width: 100%; height: 100%; object-fit: contain; animation: breathe 3.6s ease-in-out infinite; filter: drop-shadow(0 18px 18px rgba(120, 90, 60, .18)); }
 @keyframes breathe { 0%, 100% { transform: translateY(0) scale(1, 1); } 50% { transform: translateY(-4px) scale(1.025, .985); } }
 body.speaking .mascot { animation: talk .5s ease-in-out infinite, breathe 3.6s ease-in-out infinite; }
 @keyframes talk { 0%, 100% { scale: 1; } 50% { scale: 1.03 .98; } }
 body.listening .mascot-wrap { transform: scale(1.06); }
 body.thinking .mascot { animation: think 1s ease-in-out infinite; }
+body[data-brain="asleep"] .mascot { animation-duration: 7s; filter: grayscale(.45) opacity(.7); }
+body[data-brain="asleep"] .mascot-wrap { position: relative; cursor: pointer; }
+body[data-brain="asleep"] .mascot-wrap::after { content: 'z z z'; position: absolute; top: 4%; right: -6%; font-weight: 700; letter-spacing: .1em; color: var(--ink-2); animation: breathe 3.6s ease-in-out infinite; }
 @keyframes think { 0%, 100% { rotate: -3deg; } 50% { rotate: 3deg; } }
 body.scene-open .mascot-wrap { transform: scale(.7); }
 
-.wave { height: 44px; display: flex; gap: 5px; align-items: center; margin-top: 18px; opacity: .25; transition: opacity .3s; }
+.wave { height: 32px; display: flex; gap: 5px; align-items: center; opacity: .25; transition: opacity .3s; }
 .wave i { display: block; width: 6px; height: 8px; border-radius: 4px; background: linear-gradient(var(--accent), var(--accent-2)); }
 body.speaking .wave, body.listening .wave { opacity: 1; }
 body.speaking .wave i, body.listening .wave i { animation: bar .9s ease-in-out infinite; }
@@ -78,32 +118,30 @@ body.speaking .wave i, body.listening .wave i { animation: bar .9s ease-in-out i
 .wave i:nth-child(4n+1) { animation-duration: .7s !important; }
 @keyframes bar { 0%, 100% { height: 8px; } 50% { height: 40px; } }
 
-/* One subtitle line. Above the stage, so it also shows while a scene is open. */
+/* Voice and controls occupy their own space; task content scrolls above them. */
+.interaction-panel {
+  position: relative; flex: none; min-width: 0; z-index: 50; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px;
+  padding: 12px 14px max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid #e8dccb; background: var(--cream);
+  box-shadow: 0 -8px 24px rgba(60, 40, 20, .04);
+}
 .subtitle {
-  position: absolute; left: 24px; right: 24px; bottom: 268px; z-index: 30;
-  margin: 0; min-height: 3em; text-align: center; font-size: 19px; line-height: 1.45; font-weight: 500;
-  opacity: 0; transform: translateY(6px); transition: opacity .5s, transform .5s;
-  pointer-events: none;
+  margin: 0; max-height: 0; padding: 0 14px; overflow: auto; overflow-wrap: anywhere;
+  font-size: 16px; line-height: 1.55; font-weight: 500; text-align: left;
+  color: var(--ink); background: var(--card); border-radius: 16px;
+  visibility: hidden; opacity: 0; transform: translateY(4px);
+  transition: opacity .2s, transform .2s; user-select: text; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: var(--accent-2) transparent;
 }
-.subtitle.show { opacity: 1; transform: none; }
-/* On the home screen the line sits just above the suggestions; their small label steps aside. */
-body:not(.scene-open) .subtitle { bottom: 286px; }
-.suggest p { transition: opacity .3s; }
-body:not(.scene-open):has(.subtitle.show) .suggest p { opacity: 0; }
-body.scene-open .subtitle {
-  bottom: 96px; left: 16px; right: 16px; min-height: 0;
-  padding: 8px 14px 8px 58px; text-align: left; font-size: 14px; line-height: 1.35;
-  color: #fff; background: rgba(32, 26, 22, .88); border-radius: 18px;
-  backdrop-filter: blur(8px);
+.subtitle.show {
+  max-height: clamp(72px, 22dvh, 144px); padding: 12px 14px;
+  border: 1px solid #eadcca; border-left: 3px solid var(--accent);
+  visibility: visible; opacity: 1; transform: none;
 }
-body.scene-open .subtitle::before {
-  content: ""; position: absolute; left: 10px; top: 50%; translate: 0 -50%;
-  width: 38px; height: 38px; border-radius: 50%; background: var(--cream) url(/img/mascot.svg) center / 120% no-repeat;
-}
+.subtitle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---------- Composer: the text input is always shown, next to the hold-to-talk mic ---------- */
 .composer {
-  position: absolute; left: 14px; right: 14px; bottom: 34px; z-index: 50;
   display: flex; align-items: center; gap: 8px;
 }
 .composer input {
@@ -111,7 +149,7 @@ body.scene-open .subtitle::before {
   font: 16px var(--font); background: #fff; outline: none; user-select: text;
 }
 .composer input:focus { border-color: var(--accent); }
-.composer .send { width: 44px; height: 44px; border-radius: 50%; border: 0; font-size: 18px; color: var(--ink); background: #efe3d0; cursor: pointer; }
+.composer .send { flex: none; width: 44px; height: 44px; border-radius: 50%; border: 0; font-size: 18px; color: var(--ink); background: #efe3d0; cursor: pointer; }
 .mic {
   flex: none; width: 64px; height: 64px; border-radius: 50%; border: 0;
   color: #fff; background: linear-gradient(145deg, var(--accent-2), var(--accent));
@@ -122,36 +160,35 @@ body.scene-open .subtitle::before {
 .mic:active, body.listening .mic { transform: scale(1.12); }
 body.listening .mic { animation: pulse 1.2s ease-out infinite; }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 122, 89, .55); } 100% { box-shadow: 0 0 0 26px rgba(255, 122, 89, 0); } }
-.mic-hint { position: absolute; left: 0; right: 0; bottom: 10px; z-index: 50; margin: 0; text-align: center; font-size: 12px; color: var(--ink-2); }
+.mic-hint { margin: 0; text-align: center; font-size: 12px; line-height: 1.4; color: var(--ink-2); }
 body.scene-open .mic-hint { display: none; }
 
 /* ---------- First run for a judge: what this is, and sentences to try ---------- */
-.intro { position: absolute; top: 46px; left: 18px; right: 18px; text-align: center; }
+.intro { width: 100%; max-width: 400px; text-align: center; }
 .intro h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: -.01em; }
 .intro p { margin: 0 0 4px; font-size: 14px; line-height: 1.4; }
 .intro small { display: block; font-size: 12px; line-height: 1.35; color: var(--ink-2); }
-body:has(.notice:not([hidden])) .intro { top: 96px; }
+body.started .intro small { display: none; }
 .suggest {
-  position: absolute; left: 14px; right: 14px; bottom: 112px;
-  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+  width: 100%; max-width: 480px; margin-top: auto;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
 }
-.suggest p { width: 100%; margin: 0; text-align: center; font-size: 12px; color: var(--ink-2); }
+.suggest p { grid-column: 1 / -1; margin: 0; text-align: center; font-size: 12px; color: var(--ink-2); }
 .suggest button {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 1px; max-width: 48%;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; min-height: 44px; overflow-wrap: anywhere;
   padding: 8px 12px; border-radius: 14px; border: 1px solid #eadcca; background: rgba(255, 255, 255, .85);
   font: 600 14px var(--font); color: var(--ink); text-align: left; cursor: pointer;
 }
 .suggest button small { font-weight: 400; font-size: 11.5px; color: var(--ink-2); }
 .suggest button:active { transform: scale(.97); }
+.scene-toolbar { flex: none; display: none; justify-content: flex-end; padding: 0 14px 8px; }
+body.scene-open .scene-toolbar { display: flex; }
 .home-btn {
-  position: absolute; top: 42px; right: 14px; z-index: 55; display: none;
-  min-height: 44px; padding: 11px 16px; border-radius: 99px; border: 0; font: 600 14px var(--font);
+  display: none;
+  min-height: 44px; padding: 8px 14px; border-radius: 99px; border: 0; font: 600 14px var(--font);
   color: #fff; background: rgba(32, 26, 22, .85); cursor: pointer;
 }
 body.scene-open .home-btn { display: block; }
-/* The offline line stays readable and never covers Home. */
-body:has(.notice:not([hidden])) .home-btn { top: 98px; }
-body:has(.notice:not([hidden])) .scene { padding-top: 150px; }
 
 /* ---------- Stage: scenes grow out of the mascot and fold back ---------- */
 .stage {
@@ -162,7 +199,7 @@ body:has(.notice:not([hidden])) .scene { padding-top: 150px; }
   pointer-events: none;
 }
 .stage.open { clip-path: circle(140% at 50% 42%); pointer-events: auto; }
-.scene { position: absolute; inset: 0; overflow-y: auto; padding: 96px 22px 220px; transition: transform .6s cubic-bezier(.7, 0, .2, 1), opacity .6s; }
+.scene { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px 22px 24px; transition: transform .6s cubic-bezier(.7, 0, .2, 1), opacity .6s; }
 .scene.leaving { transform: translateY(-100%); opacity: .4; }
 .scene.entering { animation: rise .6s cubic-bezier(.7, 0, .2, 1); }
 @keyframes rise { from { transform: translateY(100%); } to { transform: none; } }
@@ -318,6 +355,7 @@ body[data-scene="generated"] .phone:has(.g-accent-dark) .statusbar { color: #f5e
 .g-subtitle { margin: 6px 0 0; font-size: 14px; color: var(--g-muted); }
 .g-body { display: grid; gap: 16px; }
 .g-body > * { margin: 0; min-width: 0; }
+.g-html { display: block; width: 100%; min-height: 50vh; margin: 4px 0 12px; }
 .g-text { font-size: 15px; line-height: 1.5; }
 .g-lead { padding: 12px 16px; border-left: 4px solid var(--g); border-radius: 4px 14px 14px 4px; background: var(--g-surface); font-size: 17px; font-weight: 500; line-height: 1.45; }
 .g-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; align-items: stretch; }
@@ -404,8 +442,23 @@ body[data-scene="generated"] .phone:has(.g-accent-dark) .statusbar { color: #f5e
 .g-image figcaption { margin-top: 8px; font-size: 13px; color: var(--g-muted); }
 
 /* Until the first tap: browsers block sound before a gesture. */
-.tap-hint { position: absolute; top: 49%; left: 50%; translate: -50% 0; margin: 0; padding: 8px 16px; border-radius: 99px; font-size: 14px; font-weight: 600; color: var(--ink-2); background: rgba(255, 255, 255, .7); animation: breathe 2.4s ease-in-out infinite; }
+.tap-hint { max-width: 100%; margin: 0; padding: 8px 14px; border-radius: 14px; text-align: center; font-size: 13px; line-height: 1.4; font-weight: 600; color: var(--ink-2); background: rgba(255, 255, 255, .7); }
 body.started .tap-hint { display: none; }
 
 /* Offline mode notice: one short line when the daily limit or the voice credit runs out. */
-.notice { position: absolute; top: 40px; left: 12px; right: 12px; z-index: 65; margin: 0; padding: 8px 12px; border-radius: 12px; font-size: 12.5px; line-height: 1.35; text-align: center; color: #fff; background: rgba(20, 16, 14, .82); }
+.notice { flex: none; margin: 0 14px 8px; padding: 8px 12px; border-radius: 12px; font-size: 12.5px; line-height: 1.35; text-align: center; color: #fff; background: rgba(20, 16, 14, .9); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* Plan line: the steps of a multi-step task, in the bottom panel above the subtitle; a step ticks
+   as it is done. It takes no room while there is no plan. */
+.plan {
+  display: flex; flex-wrap: wrap; gap: 4px 6px; min-width: 0;
+  margin: 0; padding: 0; list-style: none; font-size: 12.5px; line-height: 1.3;
+}
+.plan:not(.show) { display: none; }
+.plan li { padding: 3px 9px; border-radius: 99px; color: var(--ink-2); background: #fff; border: 1px solid #eadcca; }
+.plan li[data-state="now"] { font-weight: 600; color: #fff; background: var(--ink); border-color: var(--ink); }
+.plan li[data-state="done"] { color: #1d6b3a; background: #d6f0de; border-color: #bfe3ca; }

@@ -1,6 +1,6 @@
 // Daily usage limit, checked before every call that spends ElevenLabs or Tavily credit.
 // Two counters per UTC day: live sessions (joining the ElevenLabs agent) and calls (TTS, web
-// search, pictures). Each has a limit for the whole site and one per visitor.
+// search). Each has a limit for the whole site and one per visitor.
 // A visitor is a hash of the client IP (never stored as the IP itself).
 //
 // Store: Vercel functions keep no memory between calls, so the limit needs a shared store.
@@ -40,6 +40,7 @@ export function visitorId(headers = {}, fallback = '') {
 
 export function memoryStore() {
   const counts = new Map();
+  const texts = new Map();
   return {
     kind: 'memory',
     async incr(keys) {
@@ -51,6 +52,14 @@ export function memoryStore() {
     },
     async get(keys) {
       return keys.map((k) => counts.get(k) || 0);
+    },
+    // Plain text values with an expiry (lib/accounts.js caches each key's agent id).
+    async getText(key) {
+      const v = texts.get(key);
+      return v && v.until > Date.now() ? v.value : null;
+    },
+    async setText(key, value, secs) {
+      texts.set(key, { value, until: Date.now() + secs * 1000 });
     },
   };
 }
@@ -80,6 +89,12 @@ export function upstashStore({ url, token, fetchImpl = fetch }) {
     },
     async get(keys) {
       return (await pipeline(keys.map((k) => ['GET', k]))).map((v) => Number(v) || 0);
+    },
+    async getText(key) {
+      return (await pipeline([['GET', key]]))[0] ?? null;
+    },
+    async setText(key, value, secs) {
+      await pipeline([['SET', key, value, 'EX', secs]]);
     },
   };
 }

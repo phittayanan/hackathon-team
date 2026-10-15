@@ -1,20 +1,14 @@
 // Payment approval card. Money moves only when the owner taps Allow.
-// The rules check runs in code here, never in the model. Voice can never press Allow.
+// The rules check runs in code (pay-rules.js), never in the model. Voice can never press Allow.
 import { T } from '../timing.js';
+import { checkRules, paymentTotal } from '../pay-rules.js';
 
 const baht = (n) => `฿${Number(n).toLocaleString('en-US')}`;
 
-export function checkRules({ total, merchant, rules }) {
-  return [
-    { label: 'Inside monthly budget', detail: `${baht(rules.monthlyBudgetLeft)} left`, ok: total <= rules.monthlyBudgetLeft },
-    { label: 'Under cap per payment', detail: `cap ${baht(rules.perPaymentCap)}`, ok: total <= rules.perPaymentCap },
-    { label: 'Shop on allowed list', detail: merchant, ok: rules.allowedShops.includes(merchant) },
-  ];
-}
-
 export default function mountPayment(el, data, agent) {
-  const total = data.total ?? data.items.reduce((s, i) => s + i.price * (i.qty || 1), 0);
-  const checks = checkRules({ ...data, total });
+  // Rules come from pay-rules.js only; data.rules from the agent is ignored.
+  const total = paymentTotal(data);
+  const checks = checkRules({ merchant: data.merchant, total });
   const passed = checks.every((c) => c.ok);
 
   el.innerHTML = `

@@ -4,14 +4,17 @@
 const initial = () => ({
   email: { version: 0, messages: [{ id: 'm1', from: 'Mom', subject: 'ของที่ต้องซื้อสัปดาห์นี้', kind: 'shopping' }] },
   calendar: { version: 0, events: [{ day: 'tomorrow', time: '11:00', title: 'Client meeting, Chiang Mai' }] },
-  health: { version: 0, synced: false, sleepScore: null, raceOpen: false },
-  flight: { version: 0, code: 'TG 102', depart: '08:00', status: 'on-time', delayMinutes: 0 },
+  health: { version: 0, synced: false, sleepScore: null, raceOpen: false, race: 'Bangkok City 10K' },
+  flight: {
+    version: 0, code: 'TG 102', day: 'tomorrow', from: 'BKK', to: 'CNX', depart: '08:00', arrive: '09:15',
+    status: 'on-time', delayMinutes: 0, cause: null, faster: { code: 'FD 3433', arrive: '09:55' },
+  },
 });
 
 export const EVENTS = {
   'sleep-synced': (f) => bump(f.health, { synced: true, sleepScore: 86, raceOpen: true }),
-  'flight-delayed': (f) => bump(f.flight, { status: 'delayed', delayMinutes: 120 }),
-  'flight-on-time': (f) => bump(f.flight, { status: 'on-time', delayMinutes: 0 }),
+  'flight-delayed': (f) => bump(f.flight, { status: 'delayed', delayMinutes: 120, cause: 'ground delay at BKK' }),
+  'flight-on-time': (f) => bump(f.flight, { status: 'on-time', delayMinutes: 0, cause: null }),
   'email-shopping': (f) => bump(f.email, { messages: [...f.email.messages, { id: `m${f.email.messages.length + 1}`, from: 'FreshMart', subject: 'Your weekly deals', kind: 'promo' }] }),
 };
 

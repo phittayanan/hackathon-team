@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createToolHandlers, TOOL_DEFS } from '../public/js/agent-tools.js';
+import { createToolHandlers, TOOL_DEFS, keptPagesNote } from '../public/js/agent-tools.js';
 import { cannedTodo, cannedFirstAid, validateSpec } from '../public/js/genui.js';
 
 function fakeUi(open = null) {
@@ -21,6 +21,15 @@ function fakeUi(open = null) {
 test('every tool has a handler', () => {
   const h = createToolHandlers(fakeUi().ui);
   for (const t of TOOL_DEFS) assert.equal(typeof h[t.name], 'function', t.name);
+});
+
+test('secretary tool validates actions, has no send action and converts snooze minutes', () => {
+  const calls = [];
+  const handlers = createToolHandlers({ secretary: (...args) => { calls.push(args); return 'demo data'; } });
+  assert.match(handlers.secretary_action({ action: 'send' }), /^error/);
+  assert.match(handlers.secretary_action({ action: 'snooze', minutes: '60' }), /^error/);
+  assert.equal(handlers.secretary_action({ action: 'snooze', minutes: '5' }), 'demo data');
+  assert.deepEqual(calls, [['snooze', 5]]);
 });
 
 test('no tool can approve a payment', () => {
@@ -62,4 +71,26 @@ test('mark_urgent and keep_scene: first-aid pages are never kept', async () => {
   const h2 = createToolHandlers(first.ui);
   await h2.render_ui({ spec_json: JSON.stringify(validateSpec(cannedFirstAid())) });
   assert.match(h2.keep_scene(), /^refused/);
+});
+
+test('kept pages: the note lists name, words and reference; render_ui reopens one by its reference', async () => {
+  const saved = { todo: { kind: 'todo', name: 'To-do list', match: ['todo', 'to-do'], spec: cannedTodo() } };
+  assert.equal(keptPagesNote({}), '');
+  const note = keptPagesNote(saved);
+  assert.match(note, /^\[screen\] Pages the user kept earlier: "To-do list" \(reference: \{"saved":"todo"\}; words: todo, to-do\)/);
+  assert.match(note, /call render_ui with spec_json set to its reference/);
+
+  const { ui, log } = fakeUi();
+  const told = [];
+  const h = createToolHandlers({ ...ui, saved: () => saved, tellAgent: (t) => told.push(t) });
+  assert.match(await h.render_ui({ spec_json: '{"saved":"todo"}' }), /^reopened the kept page "To-do list"/);
+  assert.deepEqual(log[0], ['open', 'generated', { savedKind: 'todo' }]);
+  assert.match(await h.render_ui({ spec_json: '{"saved":"groceries"}' }), /^error: no kept page "groceries"/);
+  assert.equal(log.length, 1);
+
+  // Keeping a page tells the agent the new list at once.
+  await h.render_ui({ spec_json: JSON.stringify(cannedTodo()) });
+  assert.match(h.keep_scene(), /^kept/);
+  assert.equal(told.length, 1);
+  assert.match(told[0], /\{"saved":"todo"\}/);
 });

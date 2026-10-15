@@ -5,13 +5,17 @@
 // Offline, simple rules decide and the page opens the scene. When the page runs the live
 // ElevenLabs agent, feed changes go into the conversation as contextual updates instead,
 // and the agent decides whether to speak.
-import { decide as defaultDecide, PROACTIVE } from './brain.js';
+import { decide as defaultDecide, PROACTIVE, URGENCY, feedUrgency, flightReason } from './brain.js';
+
+export { flightReason };
 import { LINES } from './lines.js';
 
-// emit(event, data): 'proactive' { id, scene, line, say } offline, or 'feed' { changed, text } when live.
+// emit(event, data): 'proactive' { id, scene, line, say } offline, or 'feed' { changed, text, urgency, context } when live.
 // The page answers a 'proactive' with ack({ id, ok }).
-export function createAgentLoop({ feeds, script = [], tickMs = 3000, decide = defaultDecide, log = console.log, onEvent = () => {}, emit = () => {} }) {
-  let presence = { scene: 'home', talking: false, listening: false, live: false };
+// quietMs: after the user's last interaction (tap, key, typing, speech), nothing is pushed for this
+// long, so the agent never cuts in while the user is in the middle of something.
+export function createAgentLoop({ feeds, script = [], tickMs = 3000, quietMs = 6000, clock = Date.now, decide = defaultDecide, log = console.log, onEvent = () => {}, emit = () => {}, onIdle = () => false }) {
+  let presence = { scene: 'home', talking: false, listening: false, typing: false, thinking: false, live: false, lastInteractionAt: 0 };
   let seen = feeds.versions();
   let handled = {};
   let retry = false;
@@ -21,21 +25,26 @@ export function createAgentLoop({ feeds, script = [], tickMs = 3000, decide = de
   const timers = new Set();
   const scriptDone = new Set();
 
-  const busy = () => presence.scene !== 'home' || presence.talking || presence.listening;
+  const busy = () =>
+    presence.scene !== 'home' || presence.talking || presence.listening || presence.typing || presence.thinking ||
+    clock() - presence.lastInteractionAt < quietMs;
 
   const push = (event, data) => emit(event, data);
 
   async function tick() {
     if (deciding || pending || busy()) return;
+    if (onIdle()) return;
     const now = feeds.versions();
     const changed = Object.keys(now).filter((k) => now[k] !== seen[k]);
     if (!changed.length && !retry) return;
     if (presence.live) {
       seen = now;
       retry = false;
-      const text = describeChanges(feeds.get(), changed);
-      log(`[agent] feeds changed: ${changed.join(', ')} -> contextual update to the live agent`);
-      push('feed', { changed, text });
+      const context = userContext(presence, clock());
+      const urgency = topUrgency(feeds.get(), changed);
+      const text = describeChanges(feeds.get(), changed, context);
+      log(`[agent] feeds changed: ${changed.join(', ')} (urgency ${urgency}) -> feed update to the live agent`);
+      push('feed', { changed, text, urgency, context });
       onEvent('push', { kind: 'feed', changed, presence });
       return;
     }
@@ -64,7 +73,15 @@ export function createAgentLoop({ feeds, script = [], tickMs = 3000, decide = de
     tick,
     setPresence(next) {
       const prev = presence;
-      presence = { scene: String(next.scene || 'home'), talking: Boolean(next.talking), listening: Boolean(next.listening), live: Boolean(next.live) };
+      presence = {
+        scene: String(next.scene || 'home'),
+        talking: Boolean(next.talking),
+        listening: Boolean(next.listening),
+        typing: Boolean(next.typing),
+        thinking: Boolean(next.thinking),
+        live: Boolean(next.live),
+        lastInteractionAt: Number(next.lastInteractionAt) || 0,
+      };
       // Demo script: a scene closing schedules the next feed event.
       if (presence.scene === 'home' && prev.scene !== 'home') {
         script.forEach((step, i) => {
@@ -104,22 +121,51 @@ export function createAgentLoop({ feeds, script = [], tickMs = 3000, decide = de
   };
 }
 
-// One plain sentence per changed feed, for the live agent.
-export function describeChanges(feeds, changed) {
+// What the user is doing when a feed update goes out (updates go out only when idle).
+export function userContext(presence, at = Date.now()) {
+  return {
+    scene: presence.scene,
+    typing: Boolean(presence.typing),
+    speaking: Boolean(presence.listening),
+    agentTalking: Boolean(presence.talking),
+    idleSeconds: presence.lastInteractionAt ? Math.max(0, Math.round((at - presence.lastInteractionAt) / 1000)) : null,
+  };
+}
+
+export const topUrgency = (feeds, changed) =>
+  changed.map((k) => feedUrgency(feeds, k)).reduce((a, b) => (URGENCY.indexOf(b) > URGENCY.indexOf(a) ? b : a), 'none');
+
+const describeContext = (c) =>
+  `User now: ${c.scene === 'home' ? 'on the agent home, no page open' : `the ${c.scene} page is open`}; ` +
+  `${c.typing ? 'typing' : 'not typing'}; ${c.speaking ? 'speaking' : 'not speaking'}; ` +
+  `${c.idleSeconds == null ? 'no interaction yet this visit' : `last interaction ${c.idleSeconds} s ago`}.`;
+
+// One plain sentence per changed feed for the live agent, each with its urgency and concrete reason
+// ("Why it matters: ..."), then what the user is doing now, so the agent can decide whether to
+// speak first and say why, or stay quiet.
+export function describeChanges(feeds, changed, context = null) {
   const say = {
     email: () => {
       const m = feeds.email.messages.at(-1);
-      return `New email from ${m.from}: "${m.subject}" (${m.kind}).`;
+      const why = m.kind === 'shopping' ? 'it is a shopping list the user may want bought' : `it is only a ${m.kind} email; nothing needs the user now`;
+      return `New email from ${m.from}: "${m.subject}" (${m.kind}). Why it matters: ${why}.`;
     },
-    calendar: () => `Calendar: ${feeds.calendar.events.map((e) => `${e.day} ${e.time} ${e.title}`).join('; ')}.`,
+    calendar: () => `Calendar: ${feeds.calendar.events.map((e) => `${e.day} ${e.time} ${e.title}`).join('; ')}. Why it matters: the schedule changed.`,
     health: () =>
       feeds.health.synced
-        ? `Sleep data synced: sleep score ${feeds.health.sleepScore}. ${feeds.health.raceOpen ? 'Sign-up for the Bangkok City 10K is open.' : ''}`
+        ? `Sleep data synced: sleep score ${feeds.health.sleepScore}.${feeds.health.raceOpen ? ` Sign-up for the ${feeds.health.race} is open.` : ''} ` +
+          `Why it matters: ${feeds.health.raceOpen ? `sleep score ${feeds.health.sleepScore} means the user is rested enough to train, and the ${feeds.health.race} sign-up just opened` : 'only a sleep score; nothing to act on'}.`
         : 'Health data reset.',
-    flight: () =>
-      feeds.flight.status === 'delayed'
-        ? `Flight ${feeds.flight.code} tomorrow at ${feeds.flight.depart} is delayed ${feeds.flight.delayMinutes} minutes. The user has a meeting at ${feeds.calendar.events[0]?.time} in Chiang Mai. A faster flight has a seat.`
-        : `Flight ${feeds.flight.code} is on time.`,
+    flight: () => {
+      const f = feeds.flight;
+      if (f.status !== 'delayed') return `Flight ${f.code} is on time.`;
+      const { why, clash } = flightReason(feeds);
+      return (
+        `Flight ${f.code} ${f.day} at ${f.depart} (${f.from} to ${f.to}) is delayed ${f.delayMinutes} minutes${f.cause ? ` (${f.cause})` : ''}. ` +
+        `Why it matters: ${why}.${clash && f.faster ? ` A faster flight, ${f.faster.code}, lands at ${f.faster.arrive} and has a seat.` : ''}`
+      );
+    },
   };
-  return `[feed update] ${changed.map((k) => say[k]?.() || `${k} changed.`).join(' ')}`.trim();
+  const lines = changed.map((k) => `${say[k]?.() || `${k} changed.`} Urgency: ${feedUrgency(feeds, k)}.`);
+  return ['[feed update]', ...lines, ...(context ? [describeContext(context)] : [])].join(' ');
 }
