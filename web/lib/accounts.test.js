@@ -4,7 +4,7 @@ import { parseKeys, createAccounts, accountId, maskKey } from './accounts.js';
 import { createHandlers } from './handlers.js';
 import { createUsage, memoryStore } from './usage.js';
 import { syncAll } from '../scripts/agent-sync.js';
-import { AGENT_NAME, KNOWLEDGE_NAME } from '../agent/config.js';
+import { AGENT_NAME, KNOWLEDGE_NAME, PAGE_AGENT_NAME } from '../agent/config.js';
 
 const ANNA = 'key-anna-1234567';
 const BEN = 'key-ben-7654321';
@@ -110,26 +110,29 @@ test('the empty mark lasts for the UTC day only', async () => {
   assert.equal(await accounts.run('key', async (x) => x.apiKey), ANNA);
 });
 
-test('agent-sync: creates the agent where it is missing, updates it where found; a failing account is skipped, masked', async () => {
+test('agent-sync: creates the agents where they are missing, updates it where found; a failing account is skipped, masked', async () => {
   const calls = [];
   const fetchImpl = async (url, opts = {}) => {
     const key = opts.headers['xi-api-key'];
     const u = new URL(String(url));
     calls.push(`${key.slice(4, 8)} ${opts.method || 'GET'} ${u.pathname}`);
     if (key === 'key-bad-0000000') return res(403, `missing permission for ${key}`);
-    if (u.pathname === '/v1/convai/agents') return res(200, { agents: key === ANNA ? [{ agent_id: 'agent_a', name: AGENT_NAME }] : [], has_more: false });
+    if (u.pathname === '/v1/convai/agents') return res(200, { agents: key === ANNA ? [{ agent_id: 'agent_a', name: AGENT_NAME }, { agent_id: 'page_a', name: PAGE_AGENT_NAME }] : [], has_more: false });
     if (u.pathname === '/v1/convai/tools' && opts.method === 'GET') return res(200, { tools: [{ id: 'tool_open', tool_config: { name: 'open_scene' } }], has_more: false });
     if (u.pathname === '/v1/convai/tools') return res(200, { id: 'tool_new' });
     if (u.pathname === '/v1/convai/knowledge-base' && key === ANNA) return res(200, { documents: [{ id: 'kb_old', name: `${KNOWLEDGE_NAME} 0123456789ab` }, { id: 'kb_mine', name: `${KNOWLEDGE_NAME} [notes]` }], has_more: false });
     if (u.pathname === '/v1/convai/knowledge-base') return res(200, { documents: [], has_more: false });
     if (u.pathname === '/v1/convai/knowledge-base/text') return res(200, { id: 'kb_new' });
-    if (u.pathname === '/v1/convai/agents/create') return res(200, { agent_id: 'agent_new' });
+    if (u.pathname === '/v1/convai/agents/create') return res(200, { agent_id: JSON.parse(opts.body).name === PAGE_AGENT_NAME ? 'page_new' : 'agent_new' });
     return res(200, {});
   };
   const logs = [];
   const warns = [];
   const out = await syncAll([ANNA, 'key-bad-0000000', BEN], { strict: false, fetchImpl, log: (m) => logs.push(m), warn: (m) => warns.push(m) });
-  assert.deepEqual(out.map((r) => [r.ok, r.agentId]), [[true, 'agent_a'], [false, undefined], [true, 'agent_new']]);
+  assert.deepEqual(out.map((r) => [r.ok, r.agentId, r.pageAgentId]), [[true, 'agent_a', 'page_a'], [false, undefined, undefined], [true, 'agent_new', 'page_new']]);
+  // The page writer: found by its exact name and updated, or created; text only, no tools.
+  assert.ok(calls.includes('anna PATCH /v1/convai/agents/page_a'));
+  assert.equal(calls.filter((c) => c === 'ben- POST /v1/convai/agents/create').length, 2);
   assert.ok(calls.includes('anna PATCH /v1/convai/agents/agent_a'));
   assert.ok(calls.includes('anna PATCH /v1/convai/tools/tool_open')); // its own tool updated, not duplicated
   assert.ok(calls.includes('ben- POST /v1/convai/agents/create'));

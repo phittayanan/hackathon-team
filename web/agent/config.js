@@ -1,5 +1,6 @@
-// The ElevenLabs agent (ElevenAgents), defined as code. scripts/agent-sync.js sends it to
-// ElevenLabs: POST /v1/convai/agents/create the first time, PATCH /v1/convai/agents/{id} after.
+// The ElevenLabs agents (ElevenAgents), defined as code: the live voice agent and the page writer.
+// scripts/agent-sync.js sends both to every account: POST /v1/convai/agents/create the first time,
+// PATCH /v1/convai/agents/{id} after.
 // Checked against the ElevenLabs API reference, October 2026:
 //   llm enum includes 'claude-sonnet-5-5'; Thai is listed only for the v3 TTS family, so the
 //   agent uses 'eleven_v3_conversational'; client tools are separate resources (tool_ids).
@@ -9,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { toolDefs } from '../public/js/agent-tools.js';
 import { DEFAULT_VOICE } from '../lib/tts.js';
 import { MAX_SESSION_SECONDS, IDLE_END_SECONDS } from '../public/js/session-limits.js';
+import { SYSTEM_PROMPT as PAGE_PROMPT } from '../lib/page-model.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -111,6 +113,45 @@ export function agentConfig({ toolIds = [], voiceId = DEFAULT_VOICE, name = AGEN
       asr: { quality: 'high', provider: 'scribe_realtime' },
     },
     // Private agent: the browser can only join with a signed URL from our server.
+    platform_settings: { auth: { enable_auth: true } },
+  };
+}
+
+// The page writer: a second, text-only agent that writes one HTML page per render_ui (lib/page-model.js
+// talks to it from the server). Checked against the ElevenLabs agents API, October 2026
+// (https://elevenlabs.io/docs/api-reference/agents/create, https://elevenlabs.io/docs/eleven-agents/guides/chat-mode):
+// - conversation_config.conversation.text_only: "If enabled audio will not be processed and only text
+//   will be used, use to avoid audio pricing." So no voice turn, no speech to text.
+// - llm: the enum has no latency figures; gemini-3.5-flash-lite is the newest flash-lite (the fast,
+//   cheap Gemini tier). The Gemini page model before this was gemini-3.5-flash.
+// - client_events: agent_chat_response_part streams the reply text as it is written.
+export const PAGE_AGENT_NAME = 'Agent OS page writer';
+export const PAGE_AGENT_LLM = 'gemini-3.5-flash-lite';
+export const PAGE_CLIENT_EVENTS = ['conversation_initiation_metadata', 'ping', 'agent_response', 'agent_chat_response_part'];
+
+export function pageAgentConfig({ name = PAGE_AGENT_NAME } = {}) {
+  return {
+    name,
+    tags: ['agent-os', 'hackathon', 'page-writer'],
+    conversation_config: {
+      agent: {
+        first_message: '',
+        prompt: {
+          prompt: PAGE_PROMPT,
+          llm: PAGE_AGENT_LLM,
+          temperature: 1,
+          max_tokens: 8192,
+          tool_ids: [],
+          built_in_tools: {},
+        },
+      },
+      conversation: {
+        text_only: true,
+        max_duration_seconds: 60,
+        client_events: PAGE_CLIENT_EVENTS,
+      },
+    },
+    // Private: only our server joins, with a signed URL.
     platform_settings: { auth: { enable_auth: true } },
   };
 }

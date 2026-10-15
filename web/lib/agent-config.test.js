@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { agentConfig, toolConfigs, knowledgeText } from '../agent/config.js';
+import { agentConfig, toolConfigs, knowledgeText, pageAgentConfig, PAGE_AGENT_NAME, PAGE_AGENT_LLM } from '../agent/config.js';
+import { SYSTEM_PROMPT } from './page-model.js';
 import { today } from '../lib/live-session.js';
 import { setEnvLines, parseToolIds, formatToolIds, knowledgeHash } from '../scripts/agent-sync.js';
 import { TOOL_DEFS, toolDefs } from '../public/js/agent-tools.js';
@@ -111,4 +112,20 @@ test('session limits: at most 3 minutes, and the call ends after 20 s without th
   const c = agentConfig().conversation_config;
   assert.equal(c.conversation.max_duration_seconds, 180);
   assert.equal(c.turn.silence_end_call_timeout, 20);
+});
+
+test('page writer agent: text only, no tools, no first message, the page-model prompt, a fast cheap LLM, private', () => {
+  const c = pageAgentConfig();
+  assert.equal(c.name, PAGE_AGENT_NAME);
+  assert.equal(c.name, 'Agent OS page writer');
+  assert.equal(c.conversation_config.conversation.text_only, true);
+  assert.ok(c.conversation_config.conversation.client_events.includes('agent_chat_response_part'));
+  assert.equal(c.conversation_config.agent.first_message, '');
+  assert.equal(c.conversation_config.agent.prompt.prompt, SYSTEM_PROMPT);
+  assert.equal(c.conversation_config.agent.prompt.llm, PAGE_AGENT_LLM);
+  assert.equal(PAGE_AGENT_LLM, 'gemini-3.5-flash-lite');
+  assert.deepEqual(c.conversation_config.agent.prompt.tool_ids, []);
+  assert.deepEqual(c.conversation_config.agent.prompt.built_in_tools, {});
+  assert.equal(c.conversation_config.tts, undefined);
+  assert.equal(c.platform_settings.auth.enable_auth, true);
 });

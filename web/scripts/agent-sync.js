@@ -1,4 +1,5 @@
-// Create or update the ElevenLabs agent from agent/config.js in every account.
+// Create or update the ElevenLabs agents from agent/config.js in every account: the live agent
+// (with its tools and fact sheet) and the text-only page writer.
 // Usage: npm run agent:sync              (every key in ELEVENLABS_API_KEYS, else ELEVENLABS_API_KEY;
 //                                          each key needs the Agents write permission)
 //        npm run agent:sync -- --dry-run (prints what it would send; no API call)
@@ -8,14 +9,14 @@
 //            A test agent of your own, named "... [test: <file>]", in the first account. Its id is
 //            written to that file, so the shared agent, which judges use, is never touched.
 //            Run the app on it: ELEVENLABS_AGENT_ID=<test id> npm start
-// Each account's agent is found by its name (no ids in env); its tools by the agent that uses them;
+// Each account's agents are found by their names (no ids in env); the live agent's tools by the agent that uses them;
 // its fact sheet (knowledge base) by name plus a hash of the text.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, dirname, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadEnv } from '../lib/env.js';
-import { agentConfig, toolConfigs, AGENT_NAME, knowledgeText, KNOWLEDGE_NAME } from '../agent/config.js';
+import { agentConfig, toolConfigs, AGENT_NAME, knowledgeText, KNOWLEDGE_NAME, pageAgentConfig, PAGE_AGENT_NAME } from '../agent/config.js';
 import { parseKeys, findAgentId, maskKey } from '../lib/accounts.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -145,13 +146,29 @@ export async function syncAccount({ apiKey, name = AGENT_NAME, fetchImpl = fetch
   return { agentId, toolIds: formatToolIds(toolIds) };
 }
 
+// The page writer agent named `name` in this account: created, or updated to match code. No tools, no fact sheet.
+export async function syncPageAgent({ apiKey, name = PAGE_AGENT_NAME, fetchImpl = fetch, log = console.log }) {
+  const call = client(apiKey, fetchImpl);
+  let agentId = await findAgentId(apiKey, name, fetchImpl);
+  const body = pageAgentConfig({ name });
+  if (agentId) {
+    await call('PATCH', `/agents/${agentId}`, body);
+    log(`page writer updated ${agentId}`);
+  } else {
+    agentId = (await call('POST', '/agents/create', body)).agent_id;
+    log(`page writer created ${agentId}`);
+  }
+  return agentId;
+}
+
 // Every key, one after the other. strict: false logs a masked warning for a failing account and goes on.
 export async function syncAll(keys, { strict = true, fetchImpl = fetch, log = console.log, warn = console.warn } = {}) {
   const results = [];
   for (const apiKey of keys) {
     log(`account ${maskKey(apiKey)}`);
     try {
-      results.push({ key: maskKey(apiKey), ok: true, ...(await syncAccount({ apiKey, fetchImpl, log })) });
+      const live = await syncAccount({ apiKey, fetchImpl, log });
+      results.push({ key: maskKey(apiKey), ok: true, ...live, pageAgentId: await syncPageAgent({ apiKey, fetchImpl, log }) });
     } catch (err) {
       const message = String(err.message).split(apiKey).join(maskKey(apiKey));
       if (strict) throw new Error(`account ${maskKey(apiKey)}: ${message}`);
@@ -164,7 +181,7 @@ export async function syncAll(keys, { strict = true, fetchImpl = fetch, log = co
 
 async function main() {
   if (process.argv.includes('--dry-run')) {
-    console.log(JSON.stringify({ tools: toolConfigs({ search: Boolean(process.env.TAVILY_API_KEY) }), agent: agentConfig({ toolIds: ['<tool ids>'], knowledgeId: '<knowledge id>' }) }, null, 2));
+    console.log(JSON.stringify({ tools: toolConfigs({ search: Boolean(process.env.TAVILY_API_KEY) }), agent: agentConfig({ toolIds: ['<tool ids>'], knowledgeId: '<knowledge id>' }), pageAgent: pageAgentConfig() }, null, 2));
     return;
   }
   const keys = parseKeys(process.env);
@@ -188,7 +205,7 @@ async function main() {
     console.log(`wrote ELEVENLABS_AGENT_ID to ${basename(TEST_ENV)}`);
     return;
   }
-  for (const r of await syncAll(keys)) console.log(`${r.key}: agent ${r.agentId}`);
+  for (const r of await syncAll(keys)) console.log(`${r.key}: agent ${r.agentId}, page writer ${r.pageAgentId}`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
