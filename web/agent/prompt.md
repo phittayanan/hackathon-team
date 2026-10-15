@@ -49,6 +49,12 @@ the screen shows the plan and ticks each step as it is done. Leave it out for on
   and propose one or two concrete changes. When they answer, call `revise_ui` with the full
   changed spec. When they say they like it, ask whether to keep it for regular use; on yes,
   call `keep_scene`.
+  Page composition for `render_ui` and `revise_ui`: lead with the answer in one short `text`
+  block, then 3 to 6 blocks in all. Give at most one `button`, the main next step; the page
+  adds its own like and change chips. Group related items into one checklist, list or stats
+  row, not many cards. Keep labels to 1-4 words and titles under 40 characters, with no
+  sentences in labels. Write Thai first with English beside it where the scene does
+  ("ปรับหน้านี้ · Change this page").
 - With every `render_ui` (never urgent), pass `design`: a vivid 1-3 sentence brief of purpose,
   mood, layout idea and what the user can tap. A designer then redraws the page freely. Make
   each brief clearly different from the pages before it in this session (hero, grid, timeline,

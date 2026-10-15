@@ -19,6 +19,9 @@
 //   call      { label, number }                   (big tel: button; only emergency numbers)
 //   image     { prompt, caption? }                (picture made by the server; at most 2 per page)
 //   sources   { items: [{ title, url }] }         (web search sources, shown as links; http(s) only)
+// Empty blocks are dropped (a checklist stays: it shows an empty state and items can be added).
+// Long strings end in '…'. Layout (pageLayout): a first text block is the lead answer, stats in a row
+// share one grid, the first button is the one primary action (none when a call button is on the page).
 // urgency: 'none' | 'urgent' | 'serious'. Urgent pages (health, injury, emergency) show steps at once:
 // no like question, no proposed changes, never kept. Serious ones always get a 1669 call button.
 
@@ -31,7 +34,12 @@ export const URGENCY = ['none', 'urgent', 'serious'];
 export const CALL_NUMBERS = ['1669', '191', '199'];
 const CALL_1669 = { type: 'call', label: 'Call 1669 (emergency medical)', number: '1669' };
 
-const str = (v, max = 120) => (typeof v === 'string' || typeof v === 'number' ? String(v).slice(0, max) : '');
+// Bounded plain string; a cut one ends in '…' (still at most max characters).
+const str = (v, max = 120) => {
+  if (typeof v !== 'string' && typeof v !== 'number') return '';
+  const s = String(v).trim();
+  return s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s;
+};
 const webUrl = (v) => {
   try {
     const u = new URL(String(v));
@@ -42,11 +50,13 @@ const webUrl = (v) => {
 };
 const arr = (v, max) => (Array.isArray(v) ? v.slice(0, max) : []);
 
+const nonEmpty = (b) => (b.items.length ? b : null);
+
 function cleanBlock(b) {
   if (!b || !BLOCK_TYPES.includes(b.type)) return null;
   switch (b.type) {
-    case 'text': return { type: 'text', text: str(b.text, 300) };
-    case 'stat': return { type: 'stat', label: str(b.label, 40), value: str(b.value, 24) };
+    case 'text': return str(b.text, 300) ? { type: 'text', text: str(b.text, 300) } : null;
+    case 'stat': return str(b.value, 24) ? { type: 'stat', label: str(b.label, 40), value: str(b.value, 24) } : null;
     case 'progress': {
       const n = Number(b.value);
       return { type: 'progress', label: str(b.label, 40), value: b.value === 'auto' ? 'auto' : Math.max(0, Math.min(100, Number.isFinite(n) ? n : 0)) };
@@ -61,19 +71,21 @@ function cleanBlock(b) {
           ...(i?.tag ? { tag: str(i.tag, 16) } : {}),
         })).filter((i) => i.text),
       };
-    case 'list': return { type: 'list', items: arr(b.items, 12).map((i) => str(i, 80)).filter(Boolean) };
-    case 'card': return { type: 'card', title: str(b.title, 60), text: str(b.text, 200) };
-    case 'chart':
-      return { type: 'chart', bars: arr(b.bars, 8).map((x) => ({ label: str(x?.label, 16), value: Math.max(0, Number(x?.value) || 0) })) };
-    case 'field': return { type: 'field', label: str(b.label, 40), placeholder: str(b.placeholder, 60) };
-    case 'button': return { type: 'button', label: str(b.label, 30) };
+    case 'list': return nonEmpty({ type: 'list', items: arr(b.items, 12).map((i) => str(i, 80)).filter(Boolean) });
+    case 'card': return str(b.title, 60) || str(b.text, 200) ? { type: 'card', title: str(b.title, 60), text: str(b.text, 200) } : null;
+    case 'chart': {
+      const bars = arr(b.bars, 8).map((x) => ({ label: str(x?.label, 16), value: Math.max(0, Number(x?.value) || 0) }));
+      return bars.length ? { type: 'chart', bars } : null;
+    }
+    case 'field': return str(b.label, 40) || str(b.placeholder, 60) ? { type: 'field', label: str(b.label, 40), placeholder: str(b.placeholder, 60) } : null;
+    case 'button': return str(b.label, 30) ? { type: 'button', label: str(b.label, 30) } : null;
     case 'divider': return { type: 'divider' };
     case 'image': return str(b.prompt, 200) ? { type: 'image', prompt: str(b.prompt, 200), caption: str(b.caption, 80) } : null;
     case 'sources': {
       const items = arr(b.items, 6).map((i) => ({ title: str(i?.title, 80) || str(i?.url, 80), url: webUrl(i?.url) })).filter((i) => i.url);
       return items.length ? { type: 'sources', items } : null;
     }
-    case 'steps': return { type: 'steps', items: arr(b.items, 8).map((i) => str(i, 160)).filter(Boolean) };
+    case 'steps': return nonEmpty({ type: 'steps', items: arr(b.items, 8).map((i) => str(i, 160)).filter(Boolean) });
     case 'call': {
       const number = str(b.number, 8).replace(/\D/g, '');
       return CALL_NUMBERS.includes(number) ? { type: 'call', label: str(b.label, 50) || `Call ${number}`, number } : null;
@@ -104,6 +116,32 @@ export function validateSpec(spec) {
     urgency,
     proposals: urgency !== 'none' ? [] : arr(spec.proposals, 2).map((p, i) => ({ id: str(p?.id, 20) || `p${i}`, label: str(p?.label ?? p, 40) })).filter((p) => p.label),
   };
+}
+
+// Colour of a free-text checklist tag: 'high' | 'medium' | 'low' | 'other'. Never used as raw class text.
+const TAG_TONES = [
+  ['low', ['low', 'later', 'ต่ำ', 'ไม่ด่วน', 'ทีหลัง']],
+  ['high', ['high', 'urgent', 'important', 'สูง', 'ด่วน', 'สำคัญ']],
+  ['medium', ['medium', 'mid', 'normal', 'กลาง', 'ปกติ']],
+];
+export function tagTone(tag) {
+  const t = String(tag || '').toLowerCase();
+  return TAG_TONES.find(([, words]) => words.some((w) => t.includes(w)))?.[0] || 'other';
+}
+
+// How a checked spec is laid out: groups in page order.
+// { kind: 'stats', blocks } for stats in a row, else { kind: 'block', block, lead?, primary? }.
+export function pageLayout(blocks) {
+  const hasCall = blocks.some((b) => b.type === 'call');
+  const primary = hasCall ? -1 : blocks.findIndex((b) => b.type === 'button');
+  const groups = [];
+  blocks.forEach((block, i) => {
+    const last = groups[groups.length - 1];
+    if (block.type === 'stat' && last?.kind === 'stats') last.blocks.push(block);
+    else if (block.type === 'stat') groups.push({ kind: 'stats', blocks: [block] });
+    else groups.push({ kind: 'block', block, lead: i === 0 && block.type === 'text', primary: i === primary });
+  });
+  return groups;
 }
 
 // ---------- No-key fallback: one canned todo spec and keyword revisions ----------

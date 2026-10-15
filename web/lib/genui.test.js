@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateSpec, cannedTodo, cannedFirstAid, reviseByKeywords } from '../public/js/genui.js';
+import { validateSpec, cannedTodo, cannedFirstAid, reviseByKeywords, pageLayout, tagTone } from '../public/js/genui.js';
 import { keywordRoute, route } from './router.js';
 
 test('validateSpec drops unknown components and keeps strings plain', () => {
@@ -79,4 +79,54 @@ test('serious spec always gets 1669; call only to emergency numbers; urgent drop
 test('image block: prompt required, at most 2 per page', () => {
   const s = validateSpec({ blocks: [1, 2, 3].map((i) => ({ type: 'image', prompt: `pic ${i}` })).concat([{ type: 'image' }]) });
   assert.equal(s.blocks.length, 2);
+});
+
+test('long strings end in an ellipsis and stay within their limit', () => {
+  const s = validateSpec({ title: 'x'.repeat(100), blocks: [{ type: 'text', text: '  short  ' }, { type: 'button', label: 'Sign me up for the Bangkok Midnight Run' }] });
+  assert.equal(s.title.length, 60);
+  assert.ok(s.title.endsWith('…'));
+  assert.equal(s.blocks[0].text, 'short');
+  assert.equal(s.blocks[1].label.length, 30);
+  assert.ok(s.blocks[1].label.endsWith('…'));
+});
+
+test('empty blocks are dropped; an empty checklist stays for its empty state', () => {
+  const s = validateSpec({
+    blocks: [
+      { type: 'text', text: '' }, { type: 'list', items: [] }, { type: 'steps', items: [''] }, { type: 'chart', bars: [] },
+      { type: 'card' }, { type: 'button' }, { type: 'stat', label: 'Saved' }, { type: 'field' }, { type: 'checklist', items: [] },
+    ],
+  });
+  assert.deepEqual(s.blocks.map((b) => b.type), ['checklist']);
+  assert.equal(validateSpec({ blocks: [{ type: 'text', text: ' ' }] }), null);
+  // Old specs still pass unchanged.
+  assert.deepEqual(validateSpec(cannedTodo()).blocks.map((b) => b.type), ['checklist', 'button']);
+});
+
+test('free-text tags map to a fixed tone, never to raw class text', () => {
+  assert.equal(tagTone('High'), 'high');
+  assert.equal(tagTone('Urgent!!'), 'high');
+  assert.equal(tagTone('ด่วน'), 'high');
+  assert.equal(tagTone('ไม่ด่วน'), 'low');
+  assert.equal(tagTone('Medium'), 'medium');
+  assert.equal(tagTone('"><script>'), 'other');
+  assert.equal(tagTone(undefined), 'other');
+});
+
+test('page layout: lead answer, stats grouped in a row, one primary button', () => {
+  const blocks = validateSpec({
+    blocks: [
+      { type: 'text', text: 'Answer' }, { type: 'stat', label: 'A', value: 1 }, { type: 'stat', label: 'B', value: 2 },
+      { type: 'button', label: 'Go' }, { type: 'stat', label: 'C', value: 3 }, { type: 'button', label: 'Later' },
+    ],
+  }).blocks;
+  const g = pageLayout(blocks);
+  assert.deepEqual(g.map((x) => x.kind), ['block', 'stats', 'block', 'stats', 'block']);
+  assert.equal(g[0].lead, true);
+  assert.equal(g[1].blocks.length, 2);
+  assert.deepEqual(g.filter((x) => x.primary).map((x) => x.block.label), ['Go']);
+  assert.equal(pageLayout([{ type: 'stat', value: 1 }, { type: 'text', text: 'not first' }])[1].lead, false);
+  // With an emergency call on the page, no other button is primary.
+  const urgent = validateSpec({ urgency: 'serious', blocks: [{ type: 'steps', items: ['Press'] }, { type: 'button', label: 'Done' }] });
+  assert.equal(pageLayout(urgent.blocks).some((x) => x.primary), false);
 });

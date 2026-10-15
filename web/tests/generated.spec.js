@@ -105,6 +105,49 @@ test('image block: picture fades in when the server returns one', async ({ page 
   await expect(page.locator('[data-testid=g-image]')).toHaveClass(/loaded/);
 });
 
+test('phone width: no sideways scroll, tap targets at least 44 px, one primary button', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await home(page);
+  const long = 'Supercalifragilisticexpialidocious_registration_https://example.com/a/very/long/path';
+  await page.evaluate((long) => window.agentOS.openScene('generated', {
+    spec: {
+      kind: 'mix', title: `${long} title`, subtitle: long, accent: 'green',
+      blocks: [
+        { type: 'text', text: `Answer first. ${long}` },
+        { type: 'stat', label: 'Saved', value: '12,400 THB' }, { type: 'stat', label: 'Goal', value: '20,000 THB' }, { type: 'stat', label: 'Days', value: 16 },
+        { type: 'checklist', items: [{ text: long, due: 'Next week Monday', tag: 'Urgent!!' }, { text: 'Short', tag: 'Low' }] },
+        { type: 'chart', bars: ['Saturday morning', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((label, i) => ({ label, value: 1000 * (i + 1) })) },
+        { type: 'card', title: long, text: long },
+        { type: 'field', label: 'Note', placeholder: long },
+        { type: 'sources', items: [{ title: long, url: 'https://example.com/a/very/long/path/that/goes/on' }, { title: 'Short', url: 'https://run.example' }] },
+        { type: 'button', label: 'Save' }, { type: 'button', label: 'Later' },
+      ],
+      proposals: [{ id: 'a', label: 'Show by category' }, { id: 'b', label: 'Dark mode' }],
+    },
+  }), long);
+  await expect(scene(page)).toBeVisible();
+  await expect(page.locator('.g-lead')).toHaveCount(1);
+  await expect(page.locator('.g-stats .g-stat')).toHaveCount(3);
+  await expect(page.locator('.g-tag-high')).toHaveText('Urgent!!');
+  await expect(page.locator('.g-button:not(.g-button-secondary)')).toHaveCount(1);
+  await expect(page.locator('.g-chart b').last()).toHaveText('8,000');
+
+  const m = await page.evaluate(() => {
+    const root = document.querySelector('.scene-generated');
+    const right = root.getBoundingClientRect().right;
+    const tooSmall = [...root.querySelectorAll('button, a, input, .g-checklist li')]
+      .map((el) => ({ el: `${el.tagName} ${el.textContent.slice(0, 20)}`, r: el.getBoundingClientRect() }))
+      .filter(({ r }) => r.height < 44 || r.width < 44)
+      .map(({ el, r }) => `${el} ${Math.round(r.width)}x${Math.round(r.height)}`);
+    const wide = [...root.querySelectorAll('*')].filter((el) => el.getBoundingClientRect().right > right + 1).map((el) => el.className);
+    return { sideways: root.scrollWidth - root.clientWidth, page: document.documentElement.scrollWidth - innerWidth, tooSmall, wide };
+  });
+  expect(m.sideways).toBe(0);
+  expect(m.page).toBe(0);
+  expect(m.wide).toEqual([]);
+  expect(m.tooSmall).toEqual([]);
+});
+
 // ---------- Free HTML pages from the page model (POST /api/page stubbed; no key, no network) ----------
 
 const SHOTS = process.env.PAGE_SHOTS; // a folder: save phone-width screenshots of the sample pages there
