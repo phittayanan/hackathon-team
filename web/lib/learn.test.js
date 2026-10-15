@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { learn, learned, learnedText, reviseLessons, noteRevise, noteKeep, noteIgnored, noteFeed, agentOpened, proactiveWatch, forgetOnRequest, MAX_LEARNED } from '../public/js/learn.js';
+import { learn, learned, learnedText, forgetLearnedKey, reviseLessons, noteRevise, noteKeep, noteIgnored, noteFeed, agentOpened, proactiveWatch, forgetOnRequest, MAX_LEARNED } from '../public/js/learn.js';
 import { createToolHandlers } from '../public/js/agent-tools.js';
 import { sessionVariables } from '../public/js/memory.js';
 
@@ -84,4 +84,13 @@ test('tools: a revise and a keep feed the learner; forget_all clears it', async 
   assert.match(learnedText(), /^did not want "Add weather"/);
   assert.match(h.remember({ key: 'forget_all' }), /^forgot everything/);
   assert.equal(learnedText(), 'nothing yet');
+});
+
+test('forgetLearnedKey forgets one preference and keeps the rest', () => {
+  learn('todo:due', 'todo pages: give checklist items due dates');
+  learn('todo:progress', 'todo pages: add a progress bar');
+  assert.equal(forgetLearnedKey('todo:due'), true);
+  assert.deepEqual(learned().map((l) => l.key), ['todo:progress']);
+  assert.equal(forgetLearnedKey('todo:due'), false);
+  assert.equal(learnedText(), 'todo pages: add a progress bar');
 });
