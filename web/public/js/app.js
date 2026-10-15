@@ -252,6 +252,8 @@ function setupSuggestions() {
     btn.addEventListener('click', () => { logEvent('suggestion', { kind: s.kind }); submitText(s.say, 'suggestion'); });
     nav.append(btn);
   }
+  // The memory page: no talking needed to see or change what the agent remembers.
+  $('memoryEntry').addEventListener('click', () => openScene('memory'));
   $('homeBtn').addEventListener('click', () => closeScene());
 }
 
@@ -344,7 +346,7 @@ function setupGreeting() {
     document.body.classList.add('started');
     window.removeEventListener('pointerdown', first, true);
     window.removeEventListener('keydown', first, true);
-    if (e.target.closest?.('#mic, input, form, .presenter, .suggest, .home-btn, .secretary-shortcuts, dialog') || (e.type === 'keydown' && e.key !== 'Enter')) return; // the user is about to talk or type
+    if (e.target.closest?.('#mic, input, form, .presenter, .suggest, .memory-entry, .home-btn, .secretary-shortcuts, dialog') || (e.type === 'keydown' && e.key !== 'Enter')) return; // the user is about to talk or type
     // A returning visitor with the live agent: the agent greets with what it remembers.
     if (live.available && hasMemory()) {
       logEvent('greet', { via: 'agent' });
