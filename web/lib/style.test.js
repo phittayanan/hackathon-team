@@ -43,7 +43,7 @@ test('styleVars follow each field', () => {
   const v = styleVars();
   assert.equal(v['--st-body'], '20px');
   assert.equal(v['--st-scale'], '1.25');
-  assert.equal(v['--st-gap'], '6px');
+  assert.equal(v['--st-gap'], '4px');
   assert.equal(v['--st-accent'], ACCENTS.rose.hex);
   assert.equal(v['--st-dim'], '1');
   assert.equal(styleVars({ ...STYLE_DEFAULT, size: 'large' })['--st-body'], '18px');

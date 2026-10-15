@@ -401,6 +401,26 @@ body.scene-open .home-btn { display: block; }
 .g-chip:hover { transform: translateY(-2px); border-color: rgba(117, 84, 232, .42); box-shadow: 0 12px 26px rgba(66, 43, 132, .17), inset 0 1px 0 #fff; }
 .g-chip:last-child { border-color: rgba(255, 255, 255, .72); background: linear-gradient(145deg, #947aff, #6744d8); color: #fff; }
 
+/* The user's own design system on the block page (public/js/style.js sets the --st-* vars on the root).
+   Defaults match the sizes above; a user-picked accent replaces the page's colour. */
+.scene-generated[data-style-accent="own"] { --g: var(--st-accent); --g-bg: color-mix(in srgb, var(--st-accent) 9%, #fff); }
+.scene-generated[data-style-contrast="high"] { --ink: var(--st-ink); --ink-2: var(--st-ink-2); color: var(--st-ink); }
+.scene-generated[data-style-contrast="high"] .g-card, .scene-generated[data-style-contrast="high"] .g-checklist li, .scene-generated[data-style-contrast="high"] .g-stat { border-color: var(--st-line); }
+.scene-generated[data-style-contrast="high"] .g-card p, .scene-generated[data-style-contrast="high"] .g-stat span, .scene-generated[data-style-contrast="high"] .g-due { opacity: 1; }
+.scene-generated .g-title { font-size: calc(28px * var(--st-scale, 1)); }
+.scene-generated .g-subtitle { font-size: calc(14px * var(--st-scale, 1)); opacity: var(--st-dim, .65); }
+.scene-generated .g-text, .scene-generated .g-item, .scene-generated .g-list, .scene-generated .g-field input { font-size: calc(15px * var(--st-scale, 1)); }
+.scene-generated .g-card p, .scene-generated .g-chip { font-size: calc(14px * var(--st-scale, 1)); }
+.scene-generated .g-progress-label, .scene-generated .g-field { font-size: calc(13px * var(--st-scale, 1)); }
+.scene-generated .g-stat span, .scene-generated .g-due, .scene-generated .g-col { font-size: calc(12px * var(--st-scale, 1)); }
+.scene-generated .g-stat b { font-size: calc(22px * var(--st-scale, 1)); }
+.scene-generated .g-card h3 { font-size: calc(1.17em * var(--st-scale, 1)); }
+.scene-generated .g-steps li { font-size: calc(17px * var(--st-scale, 1)); }
+.scene-generated .g-checklist, .scene-generated .g-chips { gap: var(--st-gap, 8px); }
+.scene-generated .g-steps { gap: calc(var(--st-gap, 8px) + 2px); }
+.scene-generated .g-checklist li, .scene-generated .g-steps li { padding: var(--st-pad, 12px); }
+.scene-generated .g-card { margin: var(--st-gap, 8px) 0; padding: calc(var(--st-pad, 12px) + 2px); }
+
 /* ---------- Hidden presenter control (tap the clock 3 times) ---------- */
 .statusbar #clock { pointer-events: auto; cursor: default; padding: 4px 8px; margin: -4px -8px; }
 .presenter { position: absolute; top: 44px; left: 12px; z-index: 60; display: grid; gap: 6px; padding: 10px; border: 1px solid var(--glass-border); border-radius: 14px; background: rgba(45, 34, 83, .84); box-shadow: 0 14px 32px rgba(30, 20, 64, .22), inset 0 1px 0 rgba(255, 255, 255, .2); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }

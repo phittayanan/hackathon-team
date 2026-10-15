@@ -80,9 +80,9 @@ export function styleText(p = styleProfile()) {
 }
 
 const SIZE = { normal: [16, 1], large: [18, 1.125], xlarge: [20, 1.25] };
-const DENSITY = { airy: [16, 18], normal: [10, 12], compact: [6, 8] }; // [gap, padding] in px, on the 4 px rhythm or close to it
+const DENSITY = { airy: [16, 16], normal: [8, 12], compact: [4, 8] }; // [gap, padding] in px, on the 4 px rhythm
 const CONTRAST = {
-  normal: { ink: '#21183b', ink2: '#6c6385', dim: '0.7', line: 'rgba(127, 127, 127, .25)' },
+  normal: { ink: '#21183b', ink2: '#6c6385', dim: '0.65', line: 'rgba(127, 127, 127, .25)' },
   high: { ink: '#0d0820', ink2: '#2f2748', dim: '1', line: '#4b4366' },
 };
 

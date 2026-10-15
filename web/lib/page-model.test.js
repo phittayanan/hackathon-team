@@ -155,3 +155,23 @@ test('/api/page: a page writer that does not start in time is a 504', async () =
   await assert.rejects(app({ ws, timeoutMs: 50 }).page({}, { spec: SPEC }), (e) => e.status === 504 && /timeout/.test(e.message));
   assert.equal(ws.sockets[0].closed, true);
 });
+
+test('pagePrompt: the user\'s design system is one line right after the brief, cut to 200 characters', () => {
+  const p = pagePrompt(SPEC, 'Bold poster', 'large text, teal accent; base: Q-Bot glass design system').split('\n');
+  assert.match(p[0], /^Design brief: Bold poster/);
+  assert.equal(p[1], "User's design system: large text, teal accent; base: Q-Bot glass design system");
+  assert.equal(pagePrompt(SPEC, 'x', 'y'.repeat(500)).split('\n')[1].length, "User's design system: ".length + 200);
+  assert.ok(!pagePrompt(SPEC, 'Bold poster').includes("User's design system"));
+});
+
+test('/api/page: the style line reaches the page writer; only a string, cut to 200 characters', async () => {
+  const userText = async (style) => {
+    const ws = fakeSocket();
+    await collect(await app({ ws }).page({}, { spec: SPEC, design: 'x', style }));
+    return ws.sockets[0].sent.find((m) => m.type === 'user_message').text;
+  };
+  assert.match(await userText('airy spacing, rose accent; base: Q-Bot glass design system'), /\nUser's design system: airy spacing, rose accent; base: Q-Bot glass design system\n/);
+  assert.match(await userText('z'.repeat(400)), new RegExp(`User's design system: z{200}\\n`));
+  assert.ok(!(await userText({ size: 'large' })).includes("User's design system"));
+  assert.ok(!(await userText(undefined)).includes("User's design system"));
+});

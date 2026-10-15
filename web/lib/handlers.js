@@ -113,10 +113,10 @@ export function createHandlers({
       if (out.error && !out.quiet) runLog.server('error', { where: 'image', message: out.error });
       return out;
     },
-    // A free HTML page for a generated scene, written by the page model from { spec, design }.
+    // A free HTML page for a generated scene, written by the page model from { spec, design, style }.
     // -> async iterator of raw HTML text (the browser sanitizes it) or an HttpError before it starts.
     // The time limit ends the text early; the browser then keeps the block page.
-    async page(headers = {}, { spec, design } = {}, { signal } = {}) {
+    async page(headers = {}, { spec, design, style } = {}, { signal } = {}) {
       if (!pageReady(accounts)) throw new HttpError(503, 'no ElevenLabs key');
       const clean = validateSpec(spec);
       if (!clean) throw new HttpError(400, 'spec has no usable blocks');
@@ -127,7 +127,8 @@ export function createHandlers({
       signal?.addEventListener('abort', () => stop.abort(signal.reason));
       try {
         // The page writer in the first account with credit; out of credit before the first text -> the next account.
-        const request = { spec: clean, design: String(design || '').slice(0, 600) };
+        // style: the user's design system line from the phone; only a string, cut to 200 characters.
+        const request = { spec: clean, design: String(design || '').slice(0, 600), style: typeof style === 'string' ? style.slice(0, 200) : '' };
         const text = await accounts.run('page', (a) => streamPage(request, envFor(env, a), { fetchImpl, WebSocketImpl, signal: stop.signal }), 'page');
         return (async function* () {
           try {
