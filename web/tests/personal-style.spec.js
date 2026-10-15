@@ -24,6 +24,7 @@ async function seedStyle(page, profile) {
   }, profile);
 }
 
+// The app shows one language at a time (i18n.js): "ใหญ่ · Large" reads "ใหญ่" in Thai.
 const storedStyle = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('agentos.style') || 'null'));
 const cssVar = (loc, name) => loc.evaluate((el, n) => getComputedStyle(el).getPropertyValue(n).trim(), name);
 const open = (page, design) => page.evaluate(([s, d]) => window.agentOS.openScene('generated', { spec: s, ...(d ? { design: d } : {}) }), [SPEC, design]);
@@ -82,12 +83,12 @@ test('memory page: change size and accent, see the preview and storage change, t
   await group.getByTestId('style-size-large').click();
   await expect(group.getByTestId('style-size-large')).toHaveAttribute('aria-pressed', 'true');
   await expect(group.getByTestId('style-size-large')).toBeFocused();
-  await expect(group.getByTestId('style-value-size')).toHaveText('ใหญ่ · Large');
+  await expect(group.getByTestId('style-value-size')).toHaveText('ใหญ่');
   expect(await cssVar(group.getByTestId('style-preview'), '--st-body')).toBe('18px');
   expect((await storedStyle(page)).size).toBe('large');
 
   await group.getByTestId('style-accent-teal').click();
-  await expect(group.getByTestId('style-value-accent')).toHaveText('เขียวอมฟ้า · Teal');
+  await expect(group.getByTestId('style-value-accent')).toHaveText('เขียวอมฟ้า');
   expect(await cssVar(group.getByTestId('style-preview'), '--st-accent')).toBe('#0f766e');
   const btn = await group.locator('.style-preview-btn').evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(btn).toBe('rgb(15, 118, 110)');
@@ -97,7 +98,7 @@ test('memory page: change size and accent, see the preview and storage change, t
 
   await group.getByTestId('style-reset').click();
   expect(await storedStyle(page)).toBeNull();
-  await expect(group.getByTestId('style-value-size')).toHaveText('ปกติ · Normal');
+  await expect(group.getByTestId('style-value-size')).toHaveText('ปกติ');
   expect(await cssVar(group.getByTestId('style-preview'), '--st-body')).toBe('16px');
   await expect(group.getByTestId('style-reset')).toBeDisabled();
 });
@@ -110,7 +111,7 @@ test('memory page: "Forget everything" also resets the style', async ({ page }) 
   await scene.getByTestId('forget-all').click(); // a style alone is something to forget
   await scene.getByTestId('forget-all-yes').click();
   expect(await storedStyle(page)).toBeNull();
-  await expect(scene.getByTestId('style-value-accent')).toHaveText('ม่วงลาเวนเดอร์ · Lavender');
+  await expect(scene.getByTestId('style-value-accent')).toHaveText('ม่วงลาเวนเดอร์');
 });
 
 for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
