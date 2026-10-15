@@ -3,3 +3,5 @@ playwright-report/
 .cache/
 logs/
 .vercel/
+.env*
+!.env.example

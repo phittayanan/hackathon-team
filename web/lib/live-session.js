@@ -2,8 +2,6 @@
 // GET /v1/convai/conversation/get-signed-url?agent_id=... -> { signed_url } (valid 15 minutes to start).
 import { creditError } from './tts.js';
 
-export const liveReady = (env = process.env) => Boolean(env.ELEVENLABS_API_KEY && env.ELEVENLABS_AGENT_ID);
-
 export async function signedUrl(env = process.env, fetchImpl = fetch) {
   const url = `https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${encodeURIComponent(env.ELEVENLABS_AGENT_ID)}`;
   const res = await fetchImpl(url, { headers: { 'xi-api-key': env.ELEVENLABS_API_KEY }, signal: AbortSignal.timeout(8000) });

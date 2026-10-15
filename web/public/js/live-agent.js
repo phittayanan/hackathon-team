@@ -8,6 +8,7 @@ import { showSubtitle, setLiveVoice } from './voice.js';
 import { logEvent } from './log.js';
 import { apiFetch, goOffline, onOffline, micBlocked } from './api.js';
 import { sessionVariables } from './memory.js';
+import { MAX_SESSION_SECONDS, IDLE_END_SECONDS } from './session-limits.js';
 
 // @elevenlabs/client, pinned. jsDelivr's +esm build is one self-contained ES module.
 const SDK_URL = 'https://cdn.jsdelivr.net/npm/@elevenlabs/client@1.26.0/+esm';
@@ -21,9 +22,18 @@ let session = null; // { at, promise }: a signed URL fetched ahead, on the user'
 let mode = 'listening';
 let modeWaiters = [];
 let silenced = false;
+let micOpen = false;
+let limits = null; // { idle, max } timers of the running session
+let asleep = false; // a session ran and ended: the page shows it and waits to be called
 export const live = { available: false, connected: false, search: false };
 
-const setBrain = (brain) => { document.body.dataset.brain = brain; };
+const setBrain = (brain) => {
+  document.body.dataset.brain = brain;
+  const hint = document.getElementById('micHint');
+  if (!hint) return;
+  hint.dataset.awake ??= hint.textContent;
+  hint.textContent = brain === 'asleep' ? 'หลับอยู่ แตะไมค์หรือตัวการ์ตูนเพื่อปลุก · Asleep: tap the mic or the mascot to wake' : hint.dataset.awake;
+};
 export const stripTags = (text) => String(text).replace(/\[[^\]]{1,30}\]\s*/g, '').trim();
 
 // A signed URL may start a conversation for 15 minutes; a prefetched one is used for 10.
@@ -66,18 +76,69 @@ export async function checkLive(healthPromise = apiFetch('/api/health').then((r)
 // ElevenLabs closes the conversation with a quota message when the credit runs out.
 const OUT_OF_CREDIT = /quota|credit|insufficient/i;
 
+// The live call was cut for credit. The server may have another teammate's account
+// (ELEVENLABS_API_KEYS): tell it which one ran out and fetch the next signed URL ahead. The page
+// then sleeps and wakes on the next account when called; with none left it goes offline.
+function creditGone(account) {
+  if (!account) return goOffline('credit');
+  const promise = apiFetch('/api/agent/session', { headers: { 'x-agentos-spent': account } }).then((r) => r.json());
+  session = { at: Date.now(), promise };
+  promise.then((s) => { if (!s.live) goOffline(s.offline || 'credit'); }, () => goOffline('credit'));
+}
+
 // Limit reached or credit gone: end the live conversation; the offline brain takes over.
 onOffline((reason) => {
   logEvent('offline', { reason });
   live.available = false;
   const ending = conversation;
-  conversation = null;
-  starting = null;
-  live.connected = false;
-  setLiveVoice(null);
-  setBrain('keywords');
+  sessionGone();
   ending?.endSession?.().catch?.(() => {});
 });
+
+// Credit saver: a session lasts at most MAX_SESSION_SECONDS and ends after IDLE_END_SECONDS
+// without the user (mic, text or speech). The agent has the same limits (agent/config.js); these
+// timers hold even before agent-sync. Feed updates and app lines never count as the user.
+function clearLimits() {
+  clearTimeout(limits?.idle);
+  clearTimeout(limits?.max);
+  limits = null;
+}
+
+function noteUser() {
+  if (!limits) return;
+  clearTimeout(limits.idle);
+  limits.idle = setTimeout(idleCheck, IDLE_END_SECONDS * 1000);
+}
+
+// Never cut the user off mid-sentence or the agent mid-reply: look again a little later.
+function idleCheck() {
+  if (!limits) return;
+  if (micOpen || mode === 'speaking') limits.idle = setTimeout(idleCheck, 3000);
+  else endLive('idle');
+}
+
+// End the session from the page ('idle' or 'time'); the page then sleeps until the user calls.
+export function endLive(why) {
+  if (!conversation) return;
+  logEvent('live_end', { why });
+  console.info(`[agent] session ended (${why}), asleep until called`);
+  const ending = conversation;
+  asleep = true;
+  sessionGone();
+  ending.endSession?.()?.catch?.(() => {});
+}
+
+// The session is over, whoever ended it. Idempotent: onDisconnect may follow endLive.
+function sessionGone() {
+  clearLimits();
+  micOpen = false;
+  live.connected = false;
+  conversation = null;
+  starting = null;
+  setLiveVoice(null);
+  setMode('listening');
+  setBrain(!live.available ? 'keywords' : asleep ? 'asleep' : 'agent-ready');
+}
 
 function setMode(next) {
   if (next === mode) return;
@@ -168,7 +229,8 @@ export function startLive(ui) {
       loadSdk(),
       checkMic(),
     ]);
-    conversation = await Conversation.startSession({
+    let self = null;
+    conversation = self = await Conversation.startSession({
       signedUrl: ticket.signedUrl,
       // Fills {{today}} (Bangkok date from the server), {{memory}} and {{learned}} (kept on this phone).
       dynamicVariables: sessionVariables(ticket),
@@ -176,18 +238,17 @@ export function startLive(ui) {
       clientTools: wrapTools(createToolHandlers(ui)),
       onConnect: () => { live.connected = true; setBrain('agent'); },
       onDisconnect: (details) => {
-        if (OUT_OF_CREDIT.test(`${details?.reason ?? ''} ${details?.message ?? ''}`)) goOffline('credit');
-        live.connected = false;
-        conversation = null;
-        starting = null;
-        setLiveVoice(null);
-        setMode('listening');
-        setBrain(live.available ? 'agent-ready' : 'keywords');
+        if (OUT_OF_CREDIT.test(`${details?.reason ?? ''} ${details?.message ?? ''}`)) creditGone(ticket.account);
+        // A late disconnect of an old session must not end a newer one.
+        if (conversation && conversation !== self) return;
+        // The agent ended it (silence or max duration) or the line dropped: sleep until called.
+        if (self) asleep = true;
+        sessionGone();
       },
       onError: (message) => {
         console.warn('[agent]', message);
         logEvent('error', { where: 'agent', message: String(message).slice(0, 300) });
-        if (OUT_OF_CREDIT.test(String(message))) goOffline('credit');
+        if (OUT_OF_CREDIT.test(String(message))) creditGone(ticket.account);
       },
       onMessage: ({ source, message }) => {
         if (!message) return;
@@ -199,13 +260,18 @@ export function startLive(ui) {
         } else {
           showSubtitle(`“${message}”`, 1400);
           logEvent('stt', { text: message, final: true });
+          noteUser();
         }
       },
       onModeChange: (m) => setMode(m?.mode ?? m),
     });
     conversation.setMicMuted(true);
     live.connected = true;
+    asleep = false;
     setBrain('agent');
+    clearLimits();
+    limits = { max: setTimeout(() => endLive('time'), MAX_SESSION_SECONDS * 1000) };
+    noteUser();
     setLiveVoice(sayThroughAgent);
     // Pages kept in earlier visits: the agent can reopen them by voice (see keptPagesNote).
     const kept = keptPagesNote(ui.saved?.());
@@ -232,8 +298,16 @@ export function silenceAgent() {
   conversation.sendUserActivity?.();
 }
 
-export const setMic = (on) => conversation?.setMicMuted(!on);
-export const sendText = (text) => conversation?.sendUserMessage(text);
+export function setMic(on) {
+  if (!conversation) return;
+  micOpen = Boolean(on);
+  noteUser();
+  conversation.setMicMuted(!on);
+}
+export function sendText(text) {
+  noteUser();
+  conversation?.sendUserMessage(text);
+}
 export const sendContext = (text) => conversation?.sendContextualUpdate(text);
 // A feed change: a contextual update alone does not give the agent a turn, so this sends it as a
 // marked message; the agent then speaks first or calls skip_turn.

@@ -76,7 +76,8 @@ test('urgent: bleeding finger shows first-aid steps at once, a 1669 button, no l
   expect(await page.evaluate(() => localStorage.getItem('agentos.savedScenes'))).toBeNull();
 });
 
-test('image block: grey frame at once; without a key the frame stays with an icon', async ({ page }) => {
+test('image block: grey frame at once; on an error the frame stays with an icon', async ({ page }) => {
+  await page.route('**/api/image', (r) => r.fulfill({ json: { error: 'empty prompt' } }));
   await home(page);
   await page.evaluate(() => window.agentOS.openScene('generated', {
     spec: { kind: 'trip', title: 'Trip', accent: 'blue', blocks: [{ type: 'image', prompt: 'beach at sunset', caption: 'Hua Hin' }, { type: 'text', text: 'Pack light' }], proposals: [] },
@@ -84,6 +85,15 @@ test('image block: grey frame at once; without a key the frame stays with an ico
   await expect(page.locator('[data-testid=g-image]')).toBeVisible();
   await expect(page.locator('[data-testid=g-image] figcaption')).toHaveText('Hua Hin');
   await expect(page.locator('[data-testid=g-image]')).toHaveClass(/failed/);
+});
+
+test('image block: a picture made ahead of time, picked by the prompt, with no key', async ({ page }) => {
+  await home(page);
+  await page.evaluate(() => window.agentOS.openScene('generated', {
+    spec: { kind: 'trip', title: 'Trip', blocks: [{ type: 'image', prompt: 'airplane over the beach' }], proposals: [] },
+  }));
+  await expect(page.locator('[data-testid=g-image]')).toHaveClass(/loaded/);
+  await expect(page.locator('[data-testid=g-image] img')).toHaveAttribute('src', '/pics/travel.png');
 });
 
 test('image block: picture fades in when the server returns one', async ({ page }) => {

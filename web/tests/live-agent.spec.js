@@ -10,9 +10,10 @@ export const Conversation = {
       calls: [],
       setMicMuted(m) { conv.muted = m; conv.calls.push('mic:' + (m ? 'muted' : 'open')); }, sendUserMessage(t) { conv.sent.push(t); },
       setVolume({ volume }) { conv.calls.push('volume:' + volume); }, sendUserActivity() {},
-      sendContextualUpdate(t) { conv.context.push(t); }, async endSession() {} };
+      sendContextualUpdate(t) { conv.context.push(t); }, async endSession() { window.__ends = (window.__ends || 0) + 1; } };
     conv.sendUserMessage = (t) => (t.startsWith('[feed update]') ? conv.context.push(t) : conv.sent.push(t));
     window.__conv = conv;
+    window.__starts = (window.__starts || 0) + 1;
     setTimeout(() => opts.onConnect && opts.onConnect({ conversationId: 'fake' }), 0);
     return conv;
   },
@@ -243,4 +244,60 @@ test('live: the mascot thinks from a typed request until the agent answers', asy
   await expect(page.locator('body')).toHaveClass(/thinking/);
   await page.evaluate(() => window.__conv.opts.onMessage({ source: 'ai', message: 'ขอหาให้แป๊บนะ' }));
   await expect(page.locator('body')).not.toHaveClass(/thinking/);
+});
+
+// Credit saver (web/public/js/session-limits.js): 20 s without the user or 3 minutes ends the session.
+test('live: 20 s without the user ends the session; the page sleeps; feeds do not wake it; the mic wakes it', async ({ page }) => {
+  await page.clock.install();
+  await liveHome(page);
+  // A feed update is not the user: it does not keep the session alive.
+  await page.evaluate(() => window.__conv.opts.onMessage({ source: 'ai', message: 'Ready.' }));
+  await page.clock.fastForward(12000);
+  await page.evaluate(() => window.agentOS.fireFeed('flight-delayed'));
+  await page.clock.fastForward(9000);
+  await expect(page.locator('body')).toHaveAttribute('data-brain', 'asleep');
+  expect(await page.evaluate(() => window.__ends)).toBe(1);
+  expect(await page.evaluate(() => window.__runlog.find((e) => e.type === 'live_end'))).toMatchObject({ why: 'idle' });
+  await expect(page.locator('#micHint')).toContainText('Asleep');
+
+  // Asleep: another feed update never starts a session by itself.
+  await page.evaluate(() => window.agentOS.fireFeed('sleep-synced'));
+  await page.clock.fastForward(30000);
+  expect(await page.evaluate(() => window.__starts)).toBe(1);
+  await expect(page.locator('body')).toHaveAttribute('data-brain', 'asleep');
+
+  // The user calls: holding the mic starts a new session.
+  await page.locator('#mic').dispatchEvent('pointerdown');
+  await expect(page.locator('body')).toHaveAttribute('data-brain', 'agent');
+  expect(await page.evaluate(() => window.__starts)).toBe(2);
+  await expect(page.locator('#micHint')).not.toContainText('Asleep');
+  await page.locator('#mic').dispatchEvent('pointerup');
+});
+
+test('live: a session ends at 3 minutes even while the user keeps talking; a mascot tap wakes it', async ({ page }) => {
+  await page.clock.install();
+  await liveHome(page);
+  // Speech every 15 s up to 165 s keeps the idle timer reset; the 3 minute cap still ends it.
+  for (let s = 0; s < 165; s += 15) {
+    await page.evaluate(() => window.__conv.opts.onMessage({ source: 'user', message: 'still here' }));
+    await page.clock.fastForward(15000);
+    await expect(page.locator('body')).toHaveAttribute('data-brain', 'agent');
+  }
+  await page.evaluate(() => window.__conv.opts.onMessage({ source: 'user', message: 'still here' }));
+  await page.clock.fastForward(16000);
+  await expect(page.locator('body')).toHaveAttribute('data-brain', 'asleep');
+  expect(await page.evaluate(() => window.__runlog.find((e) => e.type === 'live_end'))).toMatchObject({ why: 'time' });
+
+  await page.locator('#mascotWrap').click();
+  await expect(page.locator('body')).toHaveAttribute('data-brain', 'agent');
+  expect(await page.evaluate(() => window.__starts)).toBe(2);
+});
+
+test('live: the agent hanging up (silence or max duration) also leaves the page asleep, not offline', async ({ page }) => {
+  await liveHome(page);
+  await page.evaluate(() => window.__conv.opts.onDisconnect({ reason: 'agent' }));
+  await expect(page.locator('body')).toHaveAttribute('data-brain', 'asleep');
+  await page.locator('#mic').dispatchEvent('pointerdown');
+  await expect(page.locator('body')).toHaveAttribute('data-brain', 'agent');
+  await page.locator('#mic').dispatchEvent('pointerup');
 });

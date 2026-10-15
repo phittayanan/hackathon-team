@@ -8,6 +8,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { toolDefs } from '../public/js/agent-tools.js';
 import { DEFAULT_VOICE } from '../lib/tts.js';
+import { MAX_SESSION_SECONDS, IDLE_END_SECONDS } from '../public/js/session-limits.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -98,9 +99,14 @@ export function agentConfig({ toolIds = [], voiceId = DEFAULT_VOICE, name = AGEN
         },
       },
       tts: { voice_id: voiceId, model_id: AGENT_TTS_MODEL },
+      // Session limits to save credit (API reference, agents create, October 2026):
+      // conversation.max_duration_seconds (default 600) and turn.silence_end_call_timeout
+      // ("maximum wait time since the user last spoke before terminating the call", default -1 = off).
+      conversation: { max_duration_seconds: MAX_SESSION_SECONDS },
       turn: {
         speculative_turn: true,
         soft_timeout_config: { timeout_seconds: -1 },
+        silence_end_call_timeout: IDLE_END_SECONDS,
       },
       asr: { quality: 'high', provider: 'scribe_realtime' },
     },

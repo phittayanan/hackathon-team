@@ -65,11 +65,13 @@ Copy [.env.example](.env.example) to `.env` at the repo root and fill in:
 | Key | With it | Without it |
 | --- | --- | --- |
 | `ELEVENLABS_API_KEY` + `ELEVENLABS_AGENT_ID` | The brain is a live ElevenLabs agent (Claude Sonnet 5.5 inside, Thai voice and speech to text). It changes the screen only through client tools: it opens scenes, draws new pages and decides when to speak first | Keywords pick the screen, a to-do request gets one ready-made page, simple rules decide when to speak first |
+| `ELEVENLABS_API_KEYS` | Several teammates' ElevenLabs keys, comma separated, used in order; one out of credit is skipped for the day (see [Add an ElevenLabs account](#add-an-elevenlabs-account)) | The single `ELEVENLABS_API_KEY` account only |
 | `TAVILY_API_KEY` | The agent gets a `web_search` tool (Tavily, free tier, basic search). Results go on a generated page with source links | There is no search tool. Nothing else changes |
 | `UPSTASH_REDIS_REST_URL` + `_TOKEN` | The daily limit is shared by every Vercel function instance (free Upstash Redis) | The limit is counted in memory: exact locally, best effort on Vercel |
 
 Then run `cd web && npm run agent:sync` once. It creates the agent from
-code and writes its id to `.env`. Run `npm start` again.
+code, or updates it, in every account. The server finds it by its name.
+Run `npm start` again.
 
 ## How it works
 
@@ -159,8 +161,10 @@ npm run agent:sync -- --dry-run   # show what would be sent
 npm run agent:sync
 ```
 
-The agent in `.env` is the one judges use. To try an agent change first, sync a
-test agent of your own. It gets new tools too, and its ids go to that file, never to `.env`:
+The agent named `Agent OS (U-Hackathon 2026)` is the one judges use. To try an
+agent change first, sync a test agent of your own (in the first account). It gets
+new tools too, and its ids go to that file, never to `.env`. `ELEVENLABS_AGENT_ID`
+pins it only with the single `ELEVENLABS_API_KEY`, not with `ELEVENLABS_API_KEYS`:
 
 ```text
 npm run agent:sync -- --env ../.env.test-agent       # creates it the first time
@@ -190,9 +194,7 @@ needed. One-time steps for the captain:
 3. Set the env vars for Production. Each command asks for the value:
 
    ```text
-   npx vercel env add ELEVENLABS_API_KEY production
-   npx vercel env add ELEVENLABS_AGENT_ID production
-   npx vercel env add ELEVENLABS_TOOL_IDS production
+   npx vercel env add ELEVENLABS_API_KEYS production
    npx vercel env add TAVILY_API_KEY production
    ```
 
@@ -201,6 +203,23 @@ needed. One-time steps for the captain:
    Marketplace. It sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`. Change
    the limits with the `USAGE_*` variables in `.env.example`.
 4. Deploy: `npx vercel --prod`.
+
+### Add an ElevenLabs account
+
+Each teammate's own account adds credit. To add one, put the key (it needs
+the Agents permission) in the production list and redeploy, in `web/`:
+
+```text
+npx vercel env rm ELEVENLABS_API_KEYS production --yes
+npx vercel env add ELEVENLABS_API_KEYS production   # paste every key, comma separated
+npx vercel --prod
+```
+
+The production build runs `agent-sync --auto`: it finds the agent named
+`Agent OS (U-Hackathon 2026)` in each account, creates it with its tools
+if it is missing, and updates it otherwise. Preview and local builds never
+sync. A failing account is a warning with its key masked, never a failed
+deploy. The server finds each key's agent by the same name.
 
 On Vercel, the run log goes to the function log: Vercel dashboard > the
 project > Logs. Search for `[runlog]`.
