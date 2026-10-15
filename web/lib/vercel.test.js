@@ -36,7 +36,7 @@ test('handlers check the daily limit before any ElevenLabs call, and say offline
     globalThis.fetch = realFetch;
   }
   assert.equal(called, false);
-  assert.deepEqual(await app.health(), { brain: 'elevenlabs-agent', tts: true, search: false, page: false, offline: 'limit' });
+  assert.deepEqual(await app.health(), { brain: 'elevenlabs-agent', tts: true, search: false, page: true, offline: 'limit' });
 });
 
 test('ElevenLabs out of credit -> offline: credit', async () => {

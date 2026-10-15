@@ -1,6 +1,6 @@
 // Several ElevenLabs accounts, each a teammate's own, so the demo lasts longer than one credit.
 // ELEVENLABS_API_KEYS: the keys, comma separated (falls back to the single ELEVENLABS_API_KEY).
-// No agent ids in env: each account's agent is found by its name (AGENT_NAME), which agent-sync
+// No agent ids in env: each account's agents are found by name (AGENT_NAME, PAGE_AGENT_NAME), which agent-sync
 // creates in every account on each production deploy. The id is cached in memory and in the usage
 // store (Upstash when configured). So a new teammate key needs only the env list and a redeploy.
 // The server uses the first account with credit. When ElevenLabs answers out of credit (or the page
@@ -8,7 +8,7 @@
 // store and the next one is used, for that call and the later ones.
 import { createHash } from 'node:crypto';
 import { storeFor, today } from './usage.js';
-import { AGENT_NAME } from '../agent/config.js';
+import { AGENT_NAME, PAGE_AGENT_NAME } from '../agent/config.js';
 
 const API = 'https://api.elevenlabs.io/v1/convai';
 const AGENT_CACHE_SECS = 6 * 3600;
@@ -49,7 +49,8 @@ export function outOfCreditError() {
   return err;
 }
 
-// need: 'agent' (signed URL: the account's agent) or 'key' (TTS: the key only).
+// need: 'agent' (signed URL: the account's live agent), 'page' (the account's page writer agent)
+// or 'key' (TTS: the key only).
 export function createAccounts({ env = process.env, store = storeFor(env), now = () => new Date(), fetchImpl = (...a) => fetch(...a) } = {}) {
   const list = parseKeys(env).map((apiKey) => ({ apiKey, id: accountId(apiKey) }));
   // The single-key setup may still pin its agent with ELEVENLABS_AGENT_ID (and test agents need it).
@@ -57,24 +58,25 @@ export function createAccounts({ env = process.env, store = storeFor(env), now =
   const agents = new Map(); // id -> { agentId, until }
   const emptyKey = (a) => `agentos:${today(now())}:empty:${a.id}`;
 
-  async function agentFor(a) {
-    if (pinned) return pinned;
-    const memo = agents.get(a.id);
+  async function agentFor(a, need = 'agent') {
+    if (pinned && need === 'agent') return pinned;
+    const name = need === 'page' ? PAGE_AGENT_NAME : AGENT_NAME;
+    const memo = agents.get(`${need}:${a.id}`);
     if (memo && memo.until > Date.now()) return memo.agentId;
-    const cacheKey = `agentos:agent:${a.id}`;
+    const cacheKey = need === 'page' ? `agentos:page-agent:${a.id}` : `agentos:agent:${a.id}`;
     let agentId = null;
     try {
       agentId = await store.getText?.(cacheKey);
     } catch { /* lookup below */ }
     if (!agentId) {
       try {
-        agentId = await findAgentId(a.apiKey, AGENT_NAME, fetchImpl);
+        agentId = await findAgentId(a.apiKey, name, fetchImpl);
       } catch (err) {
         console.warn(`[accounts] account ${a.id}: agent lookup failed (${err.message})`);
       }
       if (agentId) await store.setText?.(cacheKey, agentId, AGENT_CACHE_SECS)?.catch?.(() => {});
     }
-    agents.set(a.id, { agentId, until: Date.now() + (agentId ? AGENT_CACHE_SECS * 1000 : MISS_RETRY_MS) });
+    agents.set(`${need}:${a.id}`, { agentId, until: Date.now() + (agentId ? AGENT_CACHE_SECS * 1000 : MISS_RETRY_MS) });
     return agentId;
   }
 
@@ -106,15 +108,15 @@ export function createAccounts({ env = process.env, store = storeFor(env), now =
       const empty = await emptyIds();
       return list.length > 0 && list.every((a) => empty.has(a.id));
     },
-    // Runs fn(account) on the first account with credit (and, for 'agent', an agent); on out of
+    // Runs fn(account) on the first account with credit (and, for 'agent' or 'page', that agent); on out of
     // credit, marks it and tries the next. An account without an agent yet is skipped, not marked.
     async run(need, fn, where = '') {
       const empty = await emptyIds();
       let noAgent = 0;
       for (const a of list) {
         if (empty.has(a.id)) continue;
-        const agentId = need === 'agent' ? await agentFor(a) : null;
-        if (need === 'agent' && !agentId) { noAgent++; continue; }
+        const agentId = need === 'key' ? null : await agentFor(a, need);
+        if (need !== 'key' && !agentId) { noAgent++; continue; }
         try {
           return await fn({ ...a, agentId });
         } catch (err) {

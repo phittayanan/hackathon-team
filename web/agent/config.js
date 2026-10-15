@@ -118,12 +118,12 @@ export function agentConfig({ toolIds = [], voiceId = DEFAULT_VOICE, name = AGEN
 }
 
 // The page writer: a second, text-only agent that writes one HTML page per render_ui (lib/page-model.js
-// talks to it from the server). Checked against the ElevenLabs agents API, October 2026
-// (https://elevenlabs.io/docs/api-reference/agents/create, https://elevenlabs.io/docs/eleven-agents/guides/chat-mode):
+// talks to it from the server). Checked October 2026 against https://elevenlabs.io/docs/eleven-agents/guides/chat-mode
+// and the API types in the official SDK (@elevenlabs/elevenlabs-js 2.73.0: ConversationConfigInput, Llm, ClientEvent):
 // - conversation_config.conversation.text_only: "If enabled audio will not be processed and only text
 //   will be used, use to avoid audio pricing." So no voice turn, no speech to text.
 // - llm: the enum has no latency figures; gemini-3.5-flash-lite is the newest flash-lite (the fast,
-//   cheap Gemini tier). The Gemini page model before this was gemini-3.5-flash.
+//   cheap Gemini tier, served by ElevenLabs).
 // - client_events: agent_chat_response_part streams the reply text as it is written.
 export const PAGE_AGENT_NAME = 'Agent OS page writer';
 export const PAGE_AGENT_LLM = 'gemini-3.5-flash-lite';

@@ -1,17 +1,21 @@
-// Page model: a fast Gemini model writes one self-contained HTML page from a render_ui spec plus the
-// live agent's design brief. The live agent itself never writes HTML (that would slow every voice turn).
-// Gemini API (docs checked October 2026: https://ai.google.dev/gemini-api/docs/models,
-// https://ai.google.dev/gemini-api/docs/deprecations - gemini-2.5-flash shuts down 2026-10-16):
-//   POST https://generativelanguage.googleapis.com/v1beta/models/<model>:streamGenerateContent?alt=sse
-//   header x-goog-api-key: <GEMINI_API_KEY>
-//   { systemInstruction: { parts: [{ text }] }, contents: [{ role: 'user', parts: [{ text }] }], generationConfig }
-//   -> server-sent events, each `data: { candidates: [{ content: { parts: [{ text }] } }] }`
-// The key stays on the server. What the model writes is sanitized in the browser before it is shown
+// Page model: the page writer, a text-only ElevenLabs agent (agent/config.js, synced by agent-sync), writes
+// one self-contained HTML page from a render_ui spec plus the live agent's design brief. The live agent
+// itself never writes HTML (that would slow every voice turn). Every page spends ElevenLabs credit.
+// One page = one short text conversation, from the server only (chat mode:
+// https://elevenlabs.io/docs/eleven-agents/guides/chat-mode; event names and fields from the official
+// SDKs, October 2026: @elevenlabs/client 1.28.0 and @elevenlabs/types 0.25.0):
+//   GET /v1/convai/conversation/get-signed-url?agent_id=<page writer> (xi-api-key) -> signed wss URL
+//   -> { type: 'conversation_initiation_client_data' }, wait for conversation_initiation_metadata
+//   -> { type: 'user_message', text }   <- agent_chat_response_part { text_response_part: { type: 'delta', text } }
+//   <- agent_response (the whole reply; the conversation is then closed). ping -> pong.
+// The key stays on the server. What the agent writes is sanitized in the browser before it is shown
 // (public/js/page-sanitize.js), so the answer is passed on as plain text.
-export const PAGE_MODEL = 'gemini-3.5-flash';
+import { signedUrl } from './live-session.js';
+
 export const PAGE_TIMEOUT_MS = 12_000;
-export const pageReady = (env = process.env) => Boolean(env.GEMINI_API_KEY);
-const modelFor = (env) => (/^[\w.-]+$/.test(env.GEMINI_PAGE_MODEL || '') ? env.GEMINI_PAGE_MODEL : PAGE_MODEL);
+// Same accounts as the live agent (lib/accounts.js): ready when there is an ElevenLabs key.
+export const pageReady = (accounts) => accounts.ready();
+const OUT_OF_CREDIT = /quota|credit|insufficient|exceeded/i;
 
 // Pictures in web/public/img the page may use by path.
 export const PICTURES = {
@@ -75,57 +79,92 @@ export class PageModelError extends Error {
   }
 }
 
-// Starts the request and checks the answer status, then returns an async iterator of text pieces.
+// Opens the conversation and sends the page request (out of credit before the first text: err.outOfCredit,
+// so the caller tries the next account), then returns an async iterator of text pieces.
 // Text before the first "<" (a ```html fence) is dropped. The signal stops it (time limit, visitor left).
-export async function streamPage({ spec, design }, env = process.env, { fetchImpl = fetch, signal } = {}) {
-  const res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${modelFor(env)}:streamGenerateContent?alt=sse`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-      contents: [{ role: 'user', parts: [{ text: pagePrompt(spec, design) }] }],
-      generationConfig: { temperature: 1, maxOutputTokens: 8192, thinkingConfig: { thinkingLevel: 'minimal' } },
-    }),
-    signal,
+// env: ELEVENLABS_API_KEY and ELEVENLABS_AGENT_ID (the page writer's id) of one account.
+export async function streamPage({ spec, design }, env = process.env, { fetchImpl = fetch, WebSocketImpl = globalThis.WebSocket, signal } = {}) {
+  if (!WebSocketImpl) throw new PageModelError('no global WebSocket (Node 22 or later)');
+  const url = await signedUrl(env, fetchImpl, signal);
+  signal?.throwIfAborted();
+  const ws = new WebSocketImpl(url);
+  const queue = [];
+  let wake = () => {};
+  let ended = null; // { error } once the conversation is over
+  let streamed = false;
+  const finish = (error = null) => {
+    if (ended) return;
+    ended = { error };
+    wake();
+    try { ws.close(); } catch { /* already closed */ }
+  };
+  const onAbort = () => finish(signal.reason || new Error('page aborted'));
+  signal?.addEventListener('abort', onAbort, { once: true });
+
+  let ready, failed;
+  const started = new Promise((resolve, reject) => { ready = resolve; failed = reject; });
+  ws.addEventListener('open', () => ws.send(JSON.stringify({ type: 'conversation_initiation_client_data' })));
+  ws.addEventListener('error', () => { failed(new PageModelError('page writer connection failed')); finish(new PageModelError('page writer connection failed')); });
+  ws.addEventListener('close', (e) => {
+    const err = new PageModelError(`page writer closed ${e.code || ''} ${e.reason || ''}`.trim());
+    if (OUT_OF_CREDIT.test(e.reason || '')) err.outOfCredit = true;
+    failed(err);
+    finish(streamed ? null : err);
   });
-  if (!res.ok) {
-    const reason = res.status === 429 ? 'page model rate limited' : res.status === 403 || res.status === 401 ? 'page model key not valid' : `page model http ${res.status}`;
-    throw new PageModelError(reason);
+  ws.addEventListener('message', (e) => {
+    let event;
+    try { event = JSON.parse(typeof e.data === 'string' ? e.data : Buffer.from(e.data).toString()); } catch { return; }
+    if (event.type === 'ping') return ws.send(JSON.stringify({ type: 'pong', event_id: event.ping_event?.event_id }));
+    if (event.type === 'conversation_initiation_metadata') {
+      ws.send(JSON.stringify({ type: 'user_message', text: pagePrompt(spec, design) }));
+      return ready();
+    }
+    if (event.type === 'agent_chat_response_part' && event.text_response_part?.type === 'delta' && event.text_response_part.text) {
+      streamed = true;
+      queue.push(event.text_response_part.text);
+      return wake();
+    }
+    if (event.type === 'agent_response') {
+      if (!streamed && event.agent_response_event?.agent_response) queue.push(event.agent_response_event.agent_response);
+      streamed = true;
+      finish();
+    }
+  });
+
+  try {
+    await Promise.race([started, new Promise((_, reject) => {
+      if (signal?.aborted) reject(signal.reason);
+      signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+    })]);
+  } catch (err) {
+    finish(err);
+    throw err;
   }
-  return pieces(res.body);
+  return pieces(async function* () {
+    try {
+      for (;;) {
+        while (queue.length) yield queue.shift();
+        if (ended) {
+          if (ended.error) throw ended.error;
+          return;
+        }
+        await new Promise((resolve) => { wake = resolve; });
+      }
+    } finally {
+      signal?.removeEventListener('abort', onAbort);
+      finish();
+    }
+  }());
 }
 
-async function* pieces(body) {
-  const decoder = new TextDecoder();
-  let buffer = '';
+async function* pieces(texts) {
   let started = false;
-  const textOf = (line) => {
-    if (!line.startsWith('data:')) return '';
-    try {
-      const event = JSON.parse(line.slice(5));
-      return (event.candidates?.[0]?.content?.parts || []).map((p) => (p.thought ? '' : p.text || '')).join('');
-    } catch {
-      return '';
-    }
-  };
-  const emit = (text) => {
+  for await (const text of texts) {
     if (!started) {
       const lt = text.indexOf('<');
-      if (lt < 0) return '';
+      if (lt < 0) continue;
       started = true;
-      return text.slice(lt);
-    }
-    return text;
-  };
-  for await (const chunk of body) {
-    buffer += typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true });
-    const lines = buffer.split(/\r?\n/);
-    buffer = lines.pop();
-    for (const line of lines) {
-      const out = emit(textOf(line.trim()));
-      if (out) yield out;
-    }
+      yield text.slice(lt);
+    } else yield text;
   }
-  const out = emit(textOf(buffer.trim()));
-  if (out) yield out;
 }

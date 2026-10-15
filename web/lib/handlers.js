@@ -1,5 +1,5 @@
 // What the server does, shared by the local server (server.js) and the Vercel functions (api/).
-// Every route that can spend ElevenLabs, Tavily or Gemini credit checks the daily usage limit first (lib/usage.js).
+// Every route that can spend ElevenLabs or Tavily credit checks the daily usage limit first (lib/usage.js).
 // When the limit is reached, or ElevenLabs says the credit ran out, the answer carries
 // `offline: 'limit' | 'credit'` and the page switches to its offline brain by itself.
 import { route } from './router.js';
@@ -25,10 +25,10 @@ export class HttpError extends Error {
 export const errorBody = (err) => ({ error: err.message, ...(err.extra || {}) });
 
 // opts: { env, logDir (local JSONL) | console log, imagesDir, inlineImages (Vercel: no disk cache), usage, accounts,
-//         fetchImpl and timeoutMs for the page model (tests) }
+//         fetchImpl, WebSocketImpl and timeoutMs for the page model (tests) }
 export function createHandlers({
   env = process.env, logDir = null, imagesDir, inlineImages = false, usage = createUsage({ env }), accounts = createAccounts({ env }),
-  fetchImpl = fetch, timeoutMs = PAGE_TIMEOUT_MS,
+  fetchImpl = fetch, WebSocketImpl = globalThis.WebSocket, timeoutMs = PAGE_TIMEOUT_MS,
 } = {}) {
   const runLog = logDir ? createRunLog(logDir) : createConsoleLog();
   const liveReady = () => accounts.ready();
@@ -58,7 +58,7 @@ export function createHandlers({
         brain: liveReady() ? 'elevenlabs-agent' : 'keywords',
         tts: ttsReady(),
         search: searchReady(env),
-        page: pageReady(env),
+        page: pageReady(accounts),
         offline: !liveReady() ? null : (await usage.siteFull()) ? 'limit' : (await accounts.allEmpty()) ? 'credit' : null,
       };
     },
@@ -117,7 +117,7 @@ export function createHandlers({
     // -> async iterator of raw HTML text (the browser sanitizes it) or an HttpError before it starts.
     // The time limit ends the text early; the browser then keeps the block page.
     async page(headers = {}, { spec, design } = {}, { signal } = {}) {
-      if (!pageReady(env)) throw new HttpError(503, 'no GEMINI_API_KEY');
+      if (!pageReady(accounts)) throw new HttpError(503, 'no ElevenLabs key');
       const clean = validateSpec(spec);
       if (!clean) throw new HttpError(400, 'spec has no usable blocks');
       if (clean.urgency !== 'none') throw new HttpError(400, 'urgent pages are never sent to the page model');
@@ -126,7 +126,9 @@ export function createHandlers({
       const timer = setTimeout(() => stop.abort(new Error('page timeout')), timeoutMs);
       signal?.addEventListener('abort', () => stop.abort(signal.reason));
       try {
-        const text = await streamPage({ spec: clean, design: String(design || '').slice(0, 600) }, env, { fetchImpl, signal: stop.signal });
+        // The page writer in the first account with credit; out of credit before the first text -> the next account.
+        const request = { spec: clean, design: String(design || '').slice(0, 600) };
+        const text = await accounts.run('page', (a) => streamPage(request, envFor(env, a), { fetchImpl, WebSocketImpl, signal: stop.signal }), 'page');
         return (async function* () {
           try {
             yield* text;

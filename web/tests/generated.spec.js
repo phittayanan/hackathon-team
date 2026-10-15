@@ -200,7 +200,7 @@ test('model page: a timeout, an error, an unfinished page or an urgent spec keep
   await expect(scene(page)).toHaveAttribute('data-view', 'blocks');
   await expect(page.locator('[data-testid=g-title]')).toHaveText('ทริปหัวหิน');
 
-  for (const [html, status] of [['{"error":"no GEMINI_API_KEY"}', 503], [PAGES.beach.slice(0, 600), 200]]) {
+  for (const [html, status] of [['{"error":"no ElevenLabs key"}', 503], [PAGES.beach.slice(0, 600), 200]]) {
     await page.unrouteAll();
     await stubPage(page, html, { status });
     await home(page);
