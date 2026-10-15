@@ -93,8 +93,10 @@ test('memory page: change size and accent, see the preview and storage change, t
   const btn = await group.locator('.style-preview-btn').evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(btn).toBe('rgb(15, 118, 110)');
   expect(await storedStyle(page)).toMatchObject({ size: 'large', accent: 'teal' });
-  await group.scrollIntoViewIfNeeded();
-  if (process.env.SHOTS) await group.screenshot({ path: 'tests/screenshots/style-group-390.png' });
+  if (process.env.SHOTS) {
+    await group.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+    await page.screenshot({ path: 'tests/screenshots/style-group-390.png' });
+  }
 
   await group.getByTestId('style-reset').click();
   expect(await storedStyle(page)).toBeNull();
