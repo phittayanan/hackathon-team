@@ -604,3 +604,22 @@ html[lang="th"] .phone :is(h1, h2, h3, b, strong, button, label, select, .eyebro
 .mem-primary { color: #fff; border-color: #ffffff80; background: linear-gradient(150deg, #a182c7e0, #7652a2e6 50%, #4d3076f0); }
 .mem-danger { color: #9e2f2b; }
 .mem-btn:focus-visible, .mem-edit input:focus-visible { outline: 3px solid #d8c5ed; }
+/* Your style group on the memory page: a live preview drawn with the --st-* vars, and choices per field. */
+.style-preview { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: var(--st-gap) 12px; margin: 12px 0 4px; padding: calc(var(--st-pad) + 4px); border-radius: 18px; border: 1px solid var(--glass-border); background: linear-gradient(155deg, #fff, color-mix(in srgb, var(--st-accent) 10%, #fff)); box-shadow: var(--glass-shadow); color: var(--st-ink); }
+.style-preview[data-style-contrast="high"] { border-color: var(--st-line); }
+.style-preview-title { grid-column: 1 / -1; margin: 0; font: 600 calc(18px * var(--st-scale)) var(--font-display); }
+.style-preview-text { grid-column: 1 / -1; margin: 0; font-size: var(--st-body); line-height: 1.45; color: var(--st-ink-2); }
+.style-preview-bars { display: flex; align-items: flex-end; gap: 6px; height: 40px; min-width: 0; font-size: 12px; color: var(--st-ink-2); }
+.style-preview-bars i { width: 14px; border-radius: 4px 4px 0 0; background: var(--st-accent); }
+.style-preview-bars span { align-self: center; }
+.style-preview-btn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; background: var(--st-accent); color: #fff; font: 600 calc(14px * var(--st-scale)) var(--font); }
+.style-row .mem-value { flex: 1 1 120px; color: var(--ink-2); font-size: 14px; }
+.style-choices { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.style-choice { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-weight: 400; transition: transform .2s ease, filter .2s ease; }
+.style-choice[aria-pressed="true"] { color: #fff; border-color: #ffffff80; background: linear-gradient(150deg, #a182c7e0, #7652a2e6 50%, #4d3076f0); }
+.style-choice:active { transform: scale(.97); }
+.style-dot { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #0003; }
+.style-reset { margin: 14px 0 0; }
+.style-reset .mem-btn:disabled { opacity: .55; cursor: default; filter: none; }
+#stage .scene-memory .style-choice:focus-visible, #stage .scene-memory .style-reset .mem-btn:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .style-choice { transition: none; } }
