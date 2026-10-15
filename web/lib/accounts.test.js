@@ -4,7 +4,7 @@ import { parseKeys, createAccounts, accountId, maskKey } from './accounts.js';
 import { createHandlers } from './handlers.js';
 import { createUsage, memoryStore } from './usage.js';
 import { syncAll } from '../scripts/agent-sync.js';
-import { AGENT_NAME } from '../agent/config.js';
+import { AGENT_NAME, KNOWLEDGE_NAME } from '../agent/config.js';
 
 const ANNA = 'key-anna-1234567';
 const BEN = 'key-ben-7654321';
@@ -120,6 +120,9 @@ test('agent-sync: creates the agent where it is missing, updates it where found;
     if (u.pathname === '/v1/convai/agents') return res(200, { agents: key === ANNA ? [{ agent_id: 'agent_a', name: AGENT_NAME }] : [], has_more: false });
     if (u.pathname === '/v1/convai/tools' && opts.method === 'GET') return res(200, { tools: [{ id: 'tool_open', tool_config: { name: 'open_scene' } }], has_more: false });
     if (u.pathname === '/v1/convai/tools') return res(200, { id: 'tool_new' });
+    if (u.pathname === '/v1/convai/knowledge-base' && key === ANNA) return res(200, { documents: [{ id: 'kb_old', name: `${KNOWLEDGE_NAME} 0123456789ab` }, { id: 'kb_mine', name: `${KNOWLEDGE_NAME} [notes]` }], has_more: false });
+    if (u.pathname === '/v1/convai/knowledge-base') return res(200, { documents: [], has_more: false });
+    if (u.pathname === '/v1/convai/knowledge-base/text') return res(200, { id: 'kb_new' });
     if (u.pathname === '/v1/convai/agents/create') return res(200, { agent_id: 'agent_new' });
     return res(200, {});
   };
@@ -131,6 +134,10 @@ test('agent-sync: creates the agent where it is missing, updates it where found;
   assert.ok(calls.includes('anna PATCH /v1/convai/tools/tool_open')); // its own tool updated, not duplicated
   assert.ok(calls.includes('ben- POST /v1/convai/agents/create'));
   assert.equal(calls.some((c) => c.startsWith('ben- PATCH /v1/convai/tools')), false);
+  // The fact sheet: uploaded per account; only an older fact sheet (name + hash) is deleted, after the agent update.
+  assert.ok(calls.includes('ben- POST /v1/convai/knowledge-base/text'));
+  assert.ok(calls.indexOf('anna DELETE /v1/convai/knowledge-base/kb_old') > calls.indexOf('anna PATCH /v1/convai/agents/agent_a'));
+  assert.equal(calls.includes('anna DELETE /v1/convai/knowledge-base/kb_mine'), false);
   const printed = [...logs, ...warns, JSON.stringify(out)].join('\n');
   assert.equal(/key-(anna|ben|bad)-\d+/.test(printed), false, 'a key was printed');
   assert.match(warns[0], /skipped/);
