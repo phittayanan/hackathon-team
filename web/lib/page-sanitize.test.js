@@ -46,6 +46,7 @@ test('CSS: no @import, no @font-face, url() only to app pictures or https; root 
   assert.ok(!css.includes('@import') && !css.includes('@font-face') && !css.includes('javascript') && !css.includes('expression('));
   assert.ok(!/url\("?https:\/\/evil/.test(css), css);
   assert.match(css, /\.pg-body\{--x:1\}/);
+  assert.equal(sanitizeCss(':host{position:fixed;inset:0} :host(.a) p{x:1}', { selectors: true }), '.pg-body{position:fixed;inset:0} .pg-body(.a) p{x:1}');
   assert.match(css, /\.pg-body\{background:url\("\/img\/mascot\.svg"\)\}/);
   assert.match(css, /url\("https:\/\/p\.example\/a\.png"\)/);
   const { html } = sanitizePage(doc('<p style="background:url(http://track.example/p.gif);color:red">x</p>', '<style>body{margin:0}</style>'));

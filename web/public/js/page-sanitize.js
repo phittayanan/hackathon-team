@@ -70,8 +70,9 @@ export function sanitizeCss(raw, { selectors = false } = {}) {
   });
   // Any url( left over is malformed: drop it.
   css = css.replace(/url\(/gi, 'x-url(').replace(/image-set\(|src\(/gi, 'x-(').replace(/\u0001/g, 'url');
-  // In a shadow root :root, html and body match nothing: point them at the page wrapper.
-  if (selectors) css = css.replace(/(^|[}{,;\s>+~])(:root|html|body)(?=[\s,{.:#[>+~])/gi, '$1.pg-body');
+  // In a shadow root :root, html and body match nothing: point them at the page wrapper. :host would
+  // style the frame the page sits in (it could cover the app's own buttons), so it gets the wrapper too.
+  if (selectors) css = css.replace(/(^|[}{,;\s>+~])(:root|:host|html|body)(?=[\s,{.:#[>+~(])/gi, '$1.pg-body');
   return css;
 }
 
