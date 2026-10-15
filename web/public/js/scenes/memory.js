@@ -1,10 +1,12 @@
 // Memory page: what the agent remembers on this phone, and the user's say over it.
 // Three groups: facts (memory.js), what it learned from use (learn.js), and kept pages (generated.js).
 // Each line can be forgotten, a fact can be edited, and "Forget everything" clears all three after
-// one confirm step on the page.
+// one confirm step on the page. With the live agent connected, every change is sent as context,
+// so the agent does not repeat a forgotten fact in this session.
 import { recall, remember, forgetMemory, MEMORY_KEYS } from '../memory.js';
 import { learned, forgetLearnedKey, forgetLearned } from '../learn.js';
 import { loadSaved, removeSaved } from './generated.js';
+import { live, sendContext } from '../live-agent.js';
 
 const MAX_LEN = 80; // remember() cuts at the same length
 const LABELS = { name: ['ชื่อ', 'Name'], likes: ['ชอบ', 'Likes'], last_task: ['งานล่าสุด', 'Last task'], note: ['โน้ต', 'Note'] };
@@ -28,7 +30,9 @@ export default function mountMemory(el) {
   let editing = null; // the fact key being edited
   let confirming = false; // "Forget everything" asked once
 
-  const tell = () => {};
+  const tell = (change) => {
+    if (live.connected) sendContext(`[screen] The user changed what you remember: ${change}.`);
+  };
 
   const group = (th, en, testid, rows) => {
     const section = h('section', 'mem-group');
