@@ -75,10 +75,12 @@ function browserSpeak(text) {
   });
 }
 
-async function liveSpeak(text) {
+async function liveSpeak(text, mine) {
   const res = await apiFetch('/api/tts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) });
   if (!res.ok) throw new Error(`tts ${res.status}`);
-  const url = URL.createObjectURL(await res.blob());
+  const blob = await res.blob();
+  if (mine !== generation) return;
+  const url = URL.createObjectURL(blob);
   try { await playAudio(url, text); } finally { URL.revokeObjectURL(url); }
 }
 
@@ -88,15 +90,17 @@ export function interruptAll() {
   queue = Promise.resolve();
   current?.pause();
   current = null;
+  document.body.classList.remove('speaking');
   if ('speechSynthesis' in window) speechSynthesis.cancel();
 }
 
 async function speakNow({ line, text, onStart }) {
+  const mine = generation;
   if (liveVoice) {
     // One voice: the live agent says it.
     showSubtitle(text, 0);
     await liveVoice(text, line, onStart);
-    showSubtitle(text, 1800);
+    if (mine === generation) showSubtitle(text, 1800);
     return;
   }
   const source = MUTED ? 'muted' : line && manifest.has(line) ? 'mp3' : liveTts ? 'tts' : 'browser';
@@ -112,15 +116,17 @@ async function speakNow({ line, text, onStart }) {
       });
     }
     else if (source === 'mp3') await playAudio(`/voice/${line}.mp3`, text);
-    else if (source === 'tts') await liveSpeak(text);
+    else if (source === 'tts') await liveSpeak(text, mine);
     else await browserSpeak(text);
   } catch (err) {
     logEvent('error', { where: 'voice', message: err.message });
-    if (source !== 'browser') await browserSpeak(text);
+    if (mine === generation && source !== 'browser') await browserSpeak(text);
   } finally {
     logEvent('audio_end', { source, id: line || text.slice(0, 40) });
-    document.body.classList.remove('speaking');
-    showSubtitle(text, 1800);
+    if (mine === generation) {
+      document.body.classList.remove('speaking');
+      showSubtitle(text, 1800);
+    }
   }
 }
 

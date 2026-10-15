@@ -67,7 +67,7 @@ export function createPlan({ render = () => {}, wait = (fn, ms) => setTimeout(fn
   return plan;
 }
 
-// The line on the screen: <ol id="plan"> inside the phone, made on first use.
+// The line on the screen: <ol id="plan"> right above the subtitle in the bottom panel, made on first use.
 function renderLine({ steps, done }) {
   if (typeof document === 'undefined') return;
   let el = document.getElementById('plan');
@@ -77,7 +77,9 @@ function renderLine({ steps, done }) {
     el.className = 'plan';
     el.dataset.testid = 'plan';
     el.setAttribute('aria-label', 'Plan');
-    (document.getElementById('phone') || document.body).append(el);
+    const subtitle = document.getElementById('subtitle');
+    if (subtitle?.parentElement) subtitle.before(el);
+    else (document.getElementById('phone') || document.body).append(el);
   }
   el.replaceChildren(...steps.map((text, i) => {
     const li = document.createElement('li');

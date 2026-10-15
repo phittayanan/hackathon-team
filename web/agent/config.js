@@ -42,7 +42,7 @@ export function toolConfigs({ search = false } = {}) {
       response_timeout_secs: 10,
       // Say what you are about to do before a scene grows or changes.
       // A page revise takes the model a few seconds: a short sentence first keeps it feeling quick.
-      ...(['open_scene', 'render_ui', 'revise_ui', 'web_search'].includes(t.name) ? { pre_tool_speech: 'force' } : {}),
+      ...(['open_scene', 'render_ui', 'revise_ui', 'web_search', 'secretary_action'].includes(t.name) ? { pre_tool_speech: 'force' } : {}),
       ...(t.name === 'web_search' ? { response_timeout_secs: 20 } : {}),
       parameters: { type: 'object', properties, required },
     };
@@ -86,12 +86,12 @@ export function agentConfig({ toolIds = [], voiceId = DEFAULT_VOICE, name = AGEN
             ? { knowledge_base: [{ type: 'text', name: KNOWLEDGE_NAME, id: knowledgeId, usage_mode: rag ? 'auto' : 'prompt' }] }
             : {}),
           ...(knowledgeId && rag ? { rag: { enabled: true, embedding_model: 'multilingual_e5_large_instruct' } } : {}),
-          // Lets the agent stay silent after a feed update that is not worth speaking about.
+          // Silence and unimportant feed updates must not trigger spoken check-ins.
           built_in_tools: {
             skip_turn: {
               type: 'system',
               name: 'skip_turn',
-              description: 'Stay silent this turn. Use it after a [feed update] that is not worth interrupting the user for.',
+              description: 'Stay silent when the user has not asked anything, including every silence timeout, or after an unimportant [feed update]. Never ask whether the user is still there. Respond normally to a new user request or an important feed update.',
               params: { system_tool_type: 'skip_turn' },
             },
           },

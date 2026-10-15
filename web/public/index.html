@@ -32,9 +32,13 @@
 </head>
 <body>
   <div class="phone" id="phone">
-    <p class="notice" id="notice" data-testid="notice" role="status" hidden></p>
     <header class="statusbar"><span id="clock">9:41</span><span class="status-icons">●●● 5G ▮</span></header>
+    <p class="notice" id="notice" data-testid="notice" role="status" hidden></p>
 
+    <nav class="scene-toolbar" aria-label="Task navigation">
+      <button class="home-btn" id="homeBtn" data-testid="home-btn" aria-label="Back to the agent home">⌂ หน้าหลัก · Home</button>
+    </nav>
+    <div class="workspace">
     <main class="home" id="home" aria-label="Agent home">
       <section class="intro" data-testid="intro">
         <h1>Agent OS</h1>
@@ -53,12 +57,12 @@
       </nav>
     </main>
 
-    <p class="subtitle" id="subtitle" aria-live="polite"></p>
-
     <section class="stage" id="stage" aria-live="polite"></section>
 
-    <button class="home-btn" id="homeBtn" data-testid="home-btn" aria-label="Back to the agent home">⌂ หน้าหลัก · Home</button>
+    </div>
 
+    <footer class="interaction-panel">
+    <p class="subtitle" id="subtitle" aria-live="polite" tabindex="0" aria-label="ข้อความเสียง · Voice transcript"></p>
     <form class="composer" id="fallback" autocomplete="off" data-testid="composer">
       <input id="fallbackInput" name="text" placeholder="พิมพ์ที่นี่ · Type here" aria-label="Type what you want to say" enterkeyhint="send">
       <button class="send" type="submit" aria-label="Send">➤</button>
@@ -67,6 +71,7 @@
       </button>
     </form>
     <p class="mic-hint" id="micHint">กดค้างที่ไมค์เพื่อพูด · Hold the mic to talk</p>
+    </footer>
   </div>
   <script type="module" src="/js/app.js"></script>
 </body>

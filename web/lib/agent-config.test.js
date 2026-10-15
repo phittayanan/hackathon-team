@@ -29,6 +29,16 @@ test('client tools match the browser handlers and are JSON-schema objects', () =
   assert.deepEqual(tools.find((t) => t.name === 'scene_action').parameters.properties.action.enum, ['confirm', 'decline', 'close']);
 });
 
+test('idle silence skips the turn while important notifications remain enabled', () => {
+  const { prompt } = agentConfig().conversation_config.agent;
+  assert.equal(prompt.built_in_tools.skip_turn.params.system_tool_type, 'skip_turn');
+  assert.match(prompt.built_in_tools.skip_turn.description, /every silence timeout/);
+  assert.match(prompt.prompt, /Never ask "are you still there\?"/);
+  assert.match(prompt.prompt, /every later timeout/);
+  assert.match(prompt.prompt, /important feed update should still get a normal response/);
+  assert.match(prompt.prompt, /Return silently to waiting with `skip_turn`/);
+});
+
 test('setEnvLines replaces or appends and keeps other lines', () => {
   const out = setEnvLines('ELEVENLABS_API_KEY=abc\nELEVENLABS_AGENT_ID=old\n', { ELEVENLABS_AGENT_ID: 'new', ELEVENLABS_TOOL_IDS: '{}' });
   assert.equal(out, 'ELEVENLABS_API_KEY=abc\nELEVENLABS_AGENT_ID=new\nELEVENLABS_TOOL_IDS={}\n');

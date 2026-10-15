@@ -41,6 +41,39 @@ async function liveHome(page) {
 
 const tool = (page, name, params) => page.evaluate(([n, p]) => window.__conv.opts.clientTools[n](p), [name, params]);
 
+test('live: scene grows while the intro is still speaking', async ({ page }) => {
+  await liveHome(page);
+  await page.evaluate(() => {
+    window.__conv.opts.onModeChange({ mode: 'speaking' });
+    window.__opening = window.__conv.opts.clientTools.open_scene({ scene: 'flight' });
+  });
+  await expect(page.locator('body')).toHaveAttribute('data-scene', 'flight', { timeout: 1000 });
+  await expect(page.locator('body')).toHaveClass(/speaking/);
+  await page.evaluate(() => window.__conv.opts.onModeChange({ mode: 'listening' }));
+});
+
+test('live: session request and SDK download start together', async ({ page }) => {
+  let release;
+  const sdkRequested = new Promise((resolve) => { release = resolve; });
+  await page.route('**/api/agent/session', async (route) => {
+    await sdkRequested;
+    await route.fulfill({ json: { live: true, signedUrl: 'wss://example.invalid/fake' } });
+  });
+  await page.route('https://cdn.jsdelivr.net/npm/@elevenlabs/client@*/+esm', async (route) => {
+    release();
+    await route.fulfill({ contentType: 'text/javascript', body: FAKE_SDK });
+  });
+  await page.addInitScript(() => {
+    navigator.mediaDevices.getUserMedia = async () => ({ getTracks: () => [{ stop() {} }] });
+  });
+  await page.route('**/api/health', (route) => route.fulfill({ json: { brain: 'elevenlabs-agent', tts: false } }));
+  await page.goto('/?test=1');
+  await expect(page.locator('body')).toHaveAttribute('data-ready', '1');
+  await page.locator('#mic').dispatchEvent('pointerdown');
+  await expect(page.locator('body')).toHaveAttribute('data-brain', 'agent', { timeout: 3000 });
+  await page.locator('#mic').dispatchEvent('pointerup');
+});
+
 test('live: client tools open and act on scenes; payment can never be approved by the agent', async ({ page }) => {
   await liveHome(page);
   expect(await tool(page, 'open_scene', { scene: 'payment' })).toBe('opened payment');
@@ -120,6 +153,8 @@ test('live: typed text goes to the agent, and feed changes arrive as contextual 
   // The agent answers (this ends the thinking state; feed updates wait while the agent thinks).
   await page.evaluate(() => window.__conv.opts.onMessage({ source: 'ai', message: 'ok' }));
 
+  // Finish the fake reply before checking feeds: thinking deliberately blocks interruptions.
+  await page.evaluate(() => window.__conv.opts.onMessage({ source: 'ai', message: 'Ready.' }));
   await page.evaluate(() => window.agentOS.fireFeed('flight-delayed'));
   await expect.poll(() => page.evaluate(() => window.__conv.context.join(' ')), { timeout: 5000 }).toContain('delayed 120 minutes');
   await expect(page.locator('body')).toHaveAttribute('data-scene', 'home');

@@ -5,5 +5,6 @@ import shopping from './shopping.js';
 import flight from './flight.js';
 import training from './training.js';
 import generated from './generated.js';
+import secretary from './secretary.js';
 
-export const SCENES = { payment, shopping, flight, training, generated };
+export const SCENES = { payment, shopping, flight, training, generated, secretary };

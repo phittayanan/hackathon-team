@@ -19,7 +19,6 @@ let starting = null;
 let sdk = null; // the SDK import, started as soon as the live agent is known to be there
 let session = null; // { at, promise }: a signed URL fetched ahead, on the user's first touch
 let mode = 'listening';
-let speakingSince = 0;
 let modeWaiters = [];
 let silenced = false;
 export const live = { available: false, connected: false, search: false };
@@ -84,7 +83,6 @@ function setMode(next) {
   if (next === mode) return;
   mode = next;
   const speaking = mode === 'speaking';
-  if (speaking) speakingSince = Date.now();
   document.body.classList.toggle('speaking', speaking);
   if (speaking) document.body.classList.remove('thinking');
   logEvent(speaking ? 'audio_start' : 'audio_end', { source: 'agent', id: 'agent' });
@@ -102,17 +100,18 @@ function setMode(next) {
 const waitMode = (want, ms) =>
   new Promise((resolve) => {
     if (mode === want) return resolve(true);
-    const timer = setTimeout(() => resolve(false), ms);
-    modeWaiters.push((m) => (m === want ? (clearTimeout(timer), resolve(true), true) : false));
+    const waiter = (m) => (m === want ? (clearTimeout(timer), resolve(true), true) : false);
+    const timer = setTimeout(() => {
+      modeWaiters = modeWaiters.filter((w) => w !== waiter);
+      resolve(false);
+    }, ms);
+    modeWaiters.push(waiter);
   });
 
-// The agent speaks first, then acts: the scene grows once its sentence has played for `leadMs`
-// (the same 0.9 s lead as the offline path), or when the sentence ends if that is sooner.
-// Never before the sentence starts (600 ms at most to start).
-export async function afterAgentSentence(leadMs = 900) {
+// Speak first, then grow the scene without waiting for the whole sentence.
+export async function afterAgentStarts() {
   if (!live.connected) return;
   if (mode !== 'speaking') await waitMode('speaking', 600);
-  if (mode === 'speaking') await waitMode('listening', Math.max(0, speakingSince + leadMs - Date.now()));
 }
 
 // An app line said by the agent's own voice (one voice, never two).

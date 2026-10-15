@@ -23,6 +23,15 @@ test('every tool has a handler', () => {
   for (const t of TOOL_DEFS) assert.equal(typeof h[t.name], 'function', t.name);
 });
 
+test('secretary tool validates actions, has no send action and converts snooze minutes', () => {
+  const calls = [];
+  const handlers = createToolHandlers({ secretary: (...args) => { calls.push(args); return 'demo data'; } });
+  assert.match(handlers.secretary_action({ action: 'send' }), /^error/);
+  assert.match(handlers.secretary_action({ action: 'snooze', minutes: '60' }), /^error/);
+  assert.equal(handlers.secretary_action({ action: 'snooze', minutes: '5' }), 'demo data');
+  assert.deepEqual(calls, [['snooze', 5]]);
+});
+
 test('no tool can approve a payment', () => {
   const { ui, log } = fakeUi({ name: 'payment', ctl: {} });
   const out = createToolHandlers(ui).scene_action({ action: 'confirm' });

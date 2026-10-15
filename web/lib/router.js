@@ -60,6 +60,20 @@ export function keywordRoute(rawText, context = null, extra = {}) {
   if (context === 'generated') return generatedAction(text, extra);
   // Health, injury or emergency comes first: first-aid steps at once.
   if (has(text, URGENT_WORDS)) return { scene: 'generated', line: 'first_aid', say: LINES.first_aid, data: { spec: cannedFirstAid() } };
+  if (context === 'secretary') {
+    const action = has(text, ['ร่าง', 'draft']) ? 'draft'
+      : has(text, ['เพิ่มงาน', 'add task']) ? 'add_tasks'
+        : has(text, ['เลื่อนเตือน', 'เตือนอีก', 'snooze']) ? 'snooze'
+          : has(text, ['ทราบแล้ว', 'รับทราบ', 'dismiss']) ? 'acknowledge' : null;
+    if (action) return { scene: null, action, minutes: /5|ห้า|five/.test(text) ? 5 : 1, say: null };
+    if (has(text, ['ส่ง', 'send'])) return { scene: null, say: 'ตรวจร่างแล้วกดปุ่มส่งข้อความทดสอบได้เลยค่ะ' };
+  }
+  if (has(text, ['สรุปวันนี้', 'ตารางวันนี้', 'วันนี้ต้องทำอะไร', 'daily brief', 'today schedule'])) {
+    return { scene: 'secretary', say: 'นี่คือตารางและงานวันนี้จากข้อมูลทดสอบค่ะ', data: { view: 'today' } };
+  }
+  if (has(text, ['เมลเป็นงาน', 'งานจากอีเมล', 'จัดการเมล', 'email to task'])) {
+    return { scene: 'secretary', say: 'อีเมลตัวอย่างมีงานสองอย่างและนัดที่อยู่ในตารางแล้วค่ะ', data: { view: 'email' } };
+  }
 
   // Inside an open scene, short answers act on that scene.
   if (context === 'payment' && has(text, PAY_WORDS.concat(YES))) {
