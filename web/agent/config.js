@@ -28,9 +28,8 @@ export const FIRST_MESSAGE = '';
 //   "อืม แป๊บนึงนะ" right after the page had opened, never before a slow first reply.
 
 // One client tool config per tool, in the ElevenLabs ClientToolConfig shape.
-// search: offer web_search (only when TAVILY_API_KEY is set where the agent is synced).
-export function toolConfigs({ search = false } = {}) {
-  return toolDefs({ search }).map((t) => {
+export function toolConfigs() {
+  return toolDefs().map((t) => {
     const properties = {};
     const required = [];
     for (const [name, p] of Object.entries(t.params)) {
@@ -45,8 +44,7 @@ export function toolConfigs({ search = false } = {}) {
       response_timeout_secs: 10,
       // Say what you are about to do before a scene grows or changes.
       // A page revise takes the model a few seconds: a short sentence first keeps it feeling quick.
-      ...(['open_scene', 'render_ui', 'revise_ui', 'web_search', 'secretary_action'].includes(t.name) ? { pre_tool_speech: 'force' } : {}),
-      ...(t.name === 'web_search' ? { response_timeout_secs: 20 } : {}),
+      ...(['open_scene', 'render_ui', 'revise_ui', 'secretary_action'].includes(t.name) ? { pre_tool_speech: 'force' } : {}),
       parameters: { type: 'object', properties, required },
     };
   });

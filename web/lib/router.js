@@ -60,6 +60,10 @@ export function keywordRoute(rawText, context = null, extra = {}) {
   if (context === 'generated') return generatedAction(text, extra);
   // Health, injury or emergency comes first: first-aid steps at once.
   if (has(text, URGENT_WORDS)) return { scene: 'generated', line: 'first_aid', say: LINES.first_aid, data: { spec: cannedFirstAid() } };
+  if (has(text, ['หาสินค้า', 'ค้นสินค้า', 'หาหูฟัง', 'เปรียบเทียบราคา', 'find products', 'find headphones', 'compare prices'])) {
+    const budget = text.match(/(?:งบ(?:ไม่เกิน)?|ไม่เกิน)\s*([\d,]+)/);
+    return { scene: 'shopping', say: 'จะค้นสินค้าจาก Shopify มาให้เลือกค่ะ', data: { catalog: true, query: String(rawText).slice(0, 250), ...(budget ? { budget: Number(budget[1].replaceAll(',', '')) } : {}) } };
+  }
   if (context === 'secretary') {
     const action = has(text, ['ร่าง', 'draft']) ? 'draft'
       : has(text, ['เพิ่มงาน', 'add task']) ? 'add_tasks'

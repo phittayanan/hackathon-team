@@ -44,7 +44,9 @@ export const TOOL_DEFS = [
     name: 'open_scene',
     description:
       'Open a prebuilt full-screen scene. shopping = read the weekly shopping email and build the list; payment = payment approval card; ' +
-      'flight = delayed flight with a faster option; training = sleep score, run plan and 10K race sign-up that fills itself.',
+      'flight = delayed flight with a faster option; training = sleep score, run plan and 10K race sign-up that fills itself. ' +
+      'For product discovery across Shopify merchants, use shopping with data_json {"catalog":true,"query":"product requirements","budget":1500}. Budget is optional THB. The page searches Shopify Global Catalog and shows real product cards for owner selection. ' +
+      'This does not place orders or pay.',
     params: {
       scene: { type: 'string', enum: PROACTIVE_SCENES, description: 'Which scene to open', required: true },
       data_json: { type: 'string', description: 'Optional JSON object with scene data in the shape of the defaults', required: false },
@@ -82,15 +84,6 @@ export const TOOL_DEFS = [
     params: { level: { type: 'string', enum: ['urgent', 'serious'], description: 'How urgent', required: true } },
   },
   {
-    name: 'web_search',
-    // Offered only when the server has a search key (TAVILY_API_KEY); see toolDefs().
-    needs: 'search',
-    description:
-      'Search the web for real, current information (events, places, prices, opening hours, news). Returns a short answer and ' +
-      'sources. Then show it with render_ui; the page lists the sources as links by itself. Search once per request.',
-    params: { query: { type: 'string', description: 'What to search for, in a few words (English or Thai)', required: true }, plan: PLAN_PARAM },
-  },
-  {
     name: 'keep_scene',
     description: 'The user liked the open generated page and said yes to keeping it: save it so it opens at once next time.',
     params: {},
@@ -109,8 +102,7 @@ export const TOOL_DEFS = [
   },
 ];
 
-// The tools to offer: web_search only when search is available.
-export const toolDefs = ({ search = false } = {}) => TOOL_DEFS.filter((t) => t.needs !== 'search' || search);
+export const toolDefs = () => TOOL_DEFS;
 
 const withSources = (spec, sources) =>
   !sources?.length || spec.blocks.some((b) => b.type === 'sources')
@@ -130,8 +122,8 @@ const parseJson = (text) => {
 };
 
 // Tools that finish a step of the plan line, and what each saves as the user's last task.
-const STEP_TOOLS = ['open_scene', 'scene_action', 'render_ui', 'revise_ui', 'web_search', 'keep_scene'];
-const FAILED = /^(error|refused|web search failed|web search is not|no results|no page)/;
+const STEP_TOOLS = ['open_scene', 'scene_action', 'render_ui', 'revise_ui', 'keep_scene'];
+const FAILED = /^(error|refused|no results|no page)/;
 const SCENE_TASKS = {
   shopping: 'groceries list from the weekly email',
   payment: 'a payment approval',
@@ -139,8 +131,8 @@ const SCENE_TASKS = {
   training: '10K training plan and race sign-up',
 };
 export function lastTask(name, params = {}) {
+  if (name === 'open_scene' && params.scene === 'shopping' && parseJson(params.data_json)?.catalog === true) return 'product discovery through Shopify';
   if (name === 'open_scene') return SCENE_TASKS[params.scene] || null;
-  if (name === 'web_search') return params.query ? `searched the web: ${params.query}` : null;
   if (name === 'render_ui') {
     const spec = parseJson(params.spec_json);
     if (spec?.saved) return `reopened the kept page: ${spec.saved}`;
@@ -164,7 +156,6 @@ export function keptPagesNote(saved = {}) {
 }
 
 // ui: { current(): { name, ctl } | null, openScene(name, data), closeScene(), action(name, extra), nudgeAllow(),
-//       search(query) -> { answer, results: [{ title, url, content }] } | { error },
 //       saved() -> { [kind]: { kind, name, match, spec } }, tellAgent(text) }
 // Optional for tests: ui.plan (the plan line) and ui.remember(key, value) (the memory).
 export function createToolHandlers(ui) {
@@ -219,8 +210,6 @@ function createScreenHandlers(ui, learn) {
     if (offered?.spec.proposals?.length) learn.noteIgnored(offered.spec, offered.spec.proposals);
     offered = null;
   };
-  // Sources of the last web search: the next page drawn shows them as links.
-  let sources = [];
 
   return {
     secretary_action({ action, minutes = '1' } = {}) {
@@ -265,8 +254,6 @@ function createScreenHandlers(ui, learn) {
       }
       let spec = validateSpec(parsed);
       if (!spec) return 'error: spec has no usable blocks; use only the fixed components';
-      spec = withSources(spec, sources);
-      sources = [];
       passedOver();
       await ui.openScene('generated', { spec, ...(spec.urgency === 'none' ? designOf(design) : {}) });
       if (spec.urgency === 'none') offered = { spec };
@@ -297,15 +284,6 @@ function createScreenHandlers(ui, learn) {
       return `marked ${spec.urgency}`;
     },
 
-    async web_search({ query } = {}) {
-      if (!ui.search) return 'web search is not available; answer from what you know and say so';
-      const out = await ui.search(String(query || ''));
-      if (!out || out.error) return `web search failed (${out?.error || 'no answer'}); answer from what you know and say so`;
-      sources = out.results.map(({ title, url }) => ({ title, url }));
-      if (!out.results.length) return 'no results; answer from what you know and say so';
-      const lines = out.results.map((r, i) => `${i + 1}. ${r.title}: ${r.content}`);
-      return [`answer: ${out.answer || '(none)'}`, ...lines, 'Now call render_ui with this information; the page shows the sources by itself.'].join('\n').slice(0, 3000);
-    },
 
     keep_scene() {
       const open = generated();

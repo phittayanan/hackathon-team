@@ -3,7 +3,6 @@
 //   GET  /api/agent/session                     -> { live, signedUrl } to join the ElevenLabs agent (if configured and under the daily limit)
 //   POST /api/route           { text, context } -> offline brain: keyword router (used when the live agent is not)
 //   POST /api/tts             { text }          -> audio/mpeg from ElevenLabs (if ELEVENLABS_API_KEY)
-//   POST /api/search          { query }         -> { answer, results: [{ title, url, content }] } via Tavily (if TAVILY_API_KEY)
 //   POST /api/image           { prompt, scene } -> { url } or { error }: a picture for a generated page
 //   GET  /api/image/<key>.png                   -> a cached picture (local only)
 //   POST /api/page            { spec, design }  -> text/plain stream of the page writer agent's HTML (ElevenLabs)
@@ -51,7 +50,7 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/api/agent/session') return send(res, 200, await app.session(h));
     if (url.pathname === '/api/route' && req.method === 'POST') return send(res, 200, await app.route(await readJson(req)));
     if (url.pathname === '/api/tts' && req.method === 'POST') return send(res, 200, await app.tts(h, await readJson(req)), 'audio/mpeg');
-    if (url.pathname === '/api/search' && req.method === 'POST') return send(res, 200, await app.search(h, await readJson(req)));
+    if (url.pathname === '/api/catalog' && req.method === 'POST') return send(res, 200, await app.catalog(h, await readJson(req)));
     if (url.pathname === '/api/image' && req.method === 'POST') return send(res, 200, await app.image(h, await readJson(req)));
     if (url.pathname === '/api/page' && req.method === 'POST') {
       const body = await readJson(req);

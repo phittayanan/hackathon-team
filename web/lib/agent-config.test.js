@@ -17,9 +17,9 @@ test('agent config: Claude Sonnet 5.5, Thai, v3 conversational voice, private', 
 });
 
 test('client tools match the browser handlers and are JSON-schema objects', () => {
-  const tools = toolConfigs({ search: true });
+  const tools = toolConfigs();
   assert.deepEqual(tools.map((t) => t.name), TOOL_DEFS.map((t) => t.name));
-  // Without a search key the web_search tool is not offered.
+  // General web search is removed from the agent.
   assert.deepEqual(toolConfigs().map((t) => t.name), toolDefs().map((t) => t.name));
   assert.equal(toolConfigs().some((t) => t.name === 'web_search'), false);
   for (const t of tools) {
@@ -86,7 +86,7 @@ test('the prompt takes {{memory}} with a placeholder, and teaches remember, plan
   assert.match(prompt, /\{\{learned\}\}/);
   assert.equal(agent.dynamic_variables.dynamic_variable_placeholders.learned, 'nothing yet');
   assert.match(prompt, /When you apply something you learned, say so/);
-  for (const name of ['open_scene', 'render_ui', 'web_search']) {
+  for (const name of ['open_scene', 'render_ui']) {
     const plan = tools.find((t) => t.name === name).parameters;
     assert.ok(plan.properties.plan && !plan.required.includes('plan'), name);
   }

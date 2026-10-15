@@ -112,8 +112,8 @@ test('plan line: a one-step task shows no plan; a failed first step drops the pl
   await tool(page, 'scene_action', { action: 'close' });
   await expectHome(page);
 
-  // No search key in this stub: a failed search is not a finished step, and its plan goes away.
-  expect(await tool(page, 'web_search', { query: '10K Bangkok', plan: 'ค้นเว็บ|ทำหน้าผลลัพธ์' })).toMatch(/^web search failed/);
+  // A rejected scene is not a finished step, and its plan goes away.
+  expect(await tool(page, 'open_scene', { scene: 'unknown', plan: 'Open scene|Show result' })).toMatch(/^error/);
   await expect(page.locator('[data-testid=plan]')).not.toHaveClass(/show/);
 });
 

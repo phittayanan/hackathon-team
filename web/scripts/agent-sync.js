@@ -75,8 +75,7 @@ async function knownTools(call, agentId) {
 
 async function syncTools(call, known, log) {
   const ids = {};
-  const search = Boolean(process.env.TAVILY_API_KEY);
-  for (const tool of toolConfigs({ search })) {
+  for (const tool of toolConfigs()) {
     const id = known[tool.name];
     if (id) {
       try {
@@ -181,7 +180,7 @@ export async function syncAll(keys, { strict = true, fetchImpl = fetch, log = co
 
 async function main() {
   if (process.argv.includes('--dry-run')) {
-    console.log(JSON.stringify({ tools: toolConfigs({ search: Boolean(process.env.TAVILY_API_KEY) }), agent: agentConfig({ toolIds: ['<tool ids>'], knowledgeId: '<knowledge id>' }), pageAgent: pageAgentConfig() }, null, 2));
+    console.log(JSON.stringify({ tools: toolConfigs(), agent: agentConfig({ toolIds: ['<tool ids>'], knowledgeId: '<knowledge id>' }), pageAgent: pageAgentConfig() }, null, 2));
     return;
   }
   const keys = parseKeys(process.env);

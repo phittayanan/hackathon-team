@@ -130,9 +130,9 @@ test('tools: a failed first call drops its plan; remember saves only known keys'
   assert.equal(facts.card_number, undefined);
 });
 
-test('last task: from the scene, the page title or the search', () => {
+test('last task: from the scene or the page title', () => {
+  assert.equal(lastTask('open_scene', { scene: 'shopping', data_json: '{"catalog":true,"query":"headphones"}' }), 'product discovery through Shopify');
   assert.equal(lastTask('open_scene', { scene: 'flight' }), 'a delayed flight re-route');
   assert.equal(lastTask('render_ui', { spec_json: JSON.stringify({ title: 'To-do list' }) }), 'made a page: To-do list');
-  assert.equal(lastTask('web_search', { query: '10K Bangkok November 2026' }), 'searched the web: 10K Bangkok November 2026');
   assert.equal(lastTask('scene_action', { action: 'close' }), null);
 });

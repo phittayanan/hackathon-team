@@ -1,7 +1,9 @@
 // Shopping list built item by item from a (fake) email, then it slides up into the payment card.
+import { mountCatalog } from './shopping-catalog.js';
 const baht = (n) => `฿${Number(n).toLocaleString('en-US')}`;
 
 export default function mountShopping(el, data, agent) {
+  if (data.catalog === true) return mountCatalog(el, data, agent);
   const total = data.items.reduce((s, i) => s + i.price * (i.qty || 1), 0);
   el.innerHTML = `
     <p class="eyebrow">Checking your email</p>

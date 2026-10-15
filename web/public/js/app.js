@@ -150,17 +150,6 @@ const toolUi = {
   // Kept pages, so the live agent can reopen one by its reference (render_ui {"saved": kind}).
   saved: () => loadSaved(),
   tellAgent: (text) => text && live.connected && sendContext(text),
-  // Web search on the server (Tavily); only when the server has a search key.
-  search: async (query) => {
-    if (!live.search) return { error: 'web search is not set up' };
-    showSubtitle('กำลังค้นเว็บ… · Searching the web…', 0);
-    document.body.classList.add('thinking');
-    const t0 = Date.now();
-    const res = await apiFetch('/api/search', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query }) });
-    const out = res.ok ? await res.json() : { error: `search ${res.status}` };
-    logEvent('search', { query, results: out.results?.length ?? 0, error: out.error || null, ms: Date.now() - t0 });
-    return out;
-  },
 };
 
 // What the user said (voice or fallback text) -> agent action.
@@ -232,6 +221,7 @@ function setupFallback() {
 }
 
 function setupHomeButton() {
+  $('catalogBtn').addEventListener('click', () => openScene('shopping', { catalog: true }));
   // The memory page: no talking needed to see or change what the agent remembers.
   $('memoryEntry').addEventListener('click', () => openScene('memory'));
   $('homeBtn').addEventListener('click', () => closeScene());
@@ -322,7 +312,7 @@ function setupGreeting() {
   let greeted = false;
   const first = (e) => {
     if (greeted) return;
-    if (e.target.closest?.('#mic, input, form, .presenter, .language-switch, .memory-entry, .home-btn, .secretary-shortcuts, dialog') || (e.type === 'keydown' && e.key !== 'Enter')) return;
+    if (e.target.closest?.('#mic, input, form, .presenter, .language-switch, .shopping-shortcut, .memory-entry, .home-btn, .secretary-shortcuts, dialog') || (e.type === 'keydown' && e.key !== 'Enter')) return;
     greeted = true;
     window.removeEventListener('pointerdown', first, true);
     window.removeEventListener('keydown', first, true);
