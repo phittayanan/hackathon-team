@@ -98,8 +98,12 @@ flowchart LR
   keep a page, or search the web.
 - **Generated pages**: the agent describes a page as JSON built only from
   fixed components (text, checklist, chart, steps, call button, source
-  links, …). The browser draws it with `textContent` only. Code written by
-  the model never runs.
+  links, …). The browser draws it with `textContent` only. With the agent's
+  design brief, a fast page model (Gemini, `POST /api/page`) then writes the page
+  as free HTML, which replaces the block page as it is written.
+  Model HTML is sanitized before it is shown (no scripts, `on*` attributes,
+  `javascript:` URLs, forms, iframes or outside loads except pictures), then
+  shown in a shadow root. Scripts written by the model never run.
 - **Server** (`web/server.js` locally, `web/api/` on Vercel): signed URL,
   text to speech, web search, the offline keyword router and the run log.
   Every route that spends credit checks the daily usage limit first.
@@ -194,6 +198,7 @@ needed. One-time steps for the captain:
    npx vercel env add ELEVENLABS_AGENT_ID production
    npx vercel env add ELEVENLABS_TOOL_IDS production
    npx vercel env add TAVILY_API_KEY production
+   npx vercel env add GEMINI_API_KEY production
    ```
 
    Use the same values as in `.env`. For an exact daily limit across
