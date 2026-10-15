@@ -6,6 +6,7 @@
 //   POST /api/search          { query }         -> { answer, results: [{ title, url, content }] } via Tavily (if TAVILY_API_KEY)
 //   POST /api/image           { prompt, scene } -> { url } or { error }: a picture for a generated page
 //   GET  /api/image/<key>.png                   -> a cached picture (local only)
+//   POST /api/page            { spec, design }  -> text/plain stream of the page model's HTML (if GEMINI_API_KEY)
 //   POST /api/log             { events }        -> appends browser events to the run log (web/logs/*.jsonl)
 // The always-on agent loop runs in the page (public/js/agent-link.js), not here.
 import { createServer } from 'node:http';
@@ -14,6 +15,7 @@ import { extname, join, normalize, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadEnv } from './lib/env.js';
 import { createHandlers, HttpError, errorBody } from './lib/handlers.js';
+import { streamText } from './lib/vercel.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 loadEnv(join(here, '..', '.env'));
@@ -51,6 +53,12 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/api/tts' && req.method === 'POST') return send(res, 200, await app.tts(h, await readJson(req)), 'audio/mpeg');
     if (url.pathname === '/api/search' && req.method === 'POST') return send(res, 200, await app.search(h, await readJson(req)));
     if (url.pathname === '/api/image' && req.method === 'POST') return send(res, 200, await app.image(h, await readJson(req)));
+    if (url.pathname === '/api/page' && req.method === 'POST') {
+      const body = await readJson(req);
+      const left = new AbortController();
+      res.on('close', () => left.abort());
+      return await streamText(res, await app.page(h, body, { signal: left.signal }));
+    }
     if (url.pathname === '/api/log' && req.method === 'POST') return send(res, 200, await app.log(h, await readJson(req)));
     if (url.pathname.startsWith('/api/image/')) {
       const file = app.images.file(url.pathname.slice('/api/image/'.length));
@@ -67,6 +75,7 @@ const server = createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream', ...cache });
     res.end(body);
   } catch (err) {
+    if (res.headersSent) return res.end();
     if (err instanceof HttpError) return send(res, err.status, errorBody(err));
     if (err.code === 'ENOENT' || err.code === 'EISDIR') return send(res, 404, { error: 'not found' });
     console.error(`[server] ${req.method} ${url.pathname}: ${err.message}`);

@@ -1,5 +1,5 @@
 // What the server does, shared by the local server (server.js) and the Vercel functions (api/).
-// Every route that can spend ElevenLabs or Tavily credit checks the daily usage limit first (lib/usage.js).
+// Every route that can spend ElevenLabs, Tavily or Gemini credit checks the daily usage limit first (lib/usage.js).
 // When the limit is reached, or ElevenLabs says the credit ran out, the answer carries
 // `offline: 'limit' | 'credit'` and the page switches to its offline brain by itself.
 import { route } from './router.js';
@@ -9,6 +9,8 @@ import { createImageService } from './images.js';
 import { createRunLog, createConsoleLog } from './runlog.js';
 import { createUsage, LimitError } from './usage.js';
 import { searchReady, tavilySearch } from './search.js';
+import { pageReady, streamPage, PAGE_TIMEOUT_MS } from './page-model.js';
+import { validateSpec } from '../public/js/genui.js';
 
 export class HttpError extends Error {
   // extra: more fields for the JSON error body, e.g. { offline: 'limit' }
@@ -21,8 +23,11 @@ export class HttpError extends Error {
 
 export const errorBody = (err) => ({ error: err.message, ...(err.extra || {}) });
 
-// opts: { env, logDir (local JSONL) | console log, imagesDir, inlineImages (Vercel: no disk cache), usage }
-export function createHandlers({ env = process.env, logDir = null, imagesDir, inlineImages = false, usage = createUsage({ env }) } = {}) {
+// opts: { env, logDir (local JSONL) | console log, imagesDir, inlineImages (Vercel: no disk cache), usage,
+//         fetchImpl and timeoutMs for the page model (tests) }
+export function createHandlers({
+  env = process.env, logDir = null, imagesDir, inlineImages = false, usage = createUsage({ env }), fetchImpl = fetch, timeoutMs = PAGE_TIMEOUT_MS,
+} = {}) {
   const runLog = logDir ? createRunLog(logDir) : createConsoleLog();
   const images = createImageService({ env, dir: imagesDir, inline: inlineImages });
   // Counts one use; over the limit -> 429 with offline: 'limit'.
@@ -49,6 +54,7 @@ export function createHandlers({ env = process.env, logDir = null, imagesDir, in
         brain: liveReady(env) ? 'elevenlabs-agent' : 'keywords',
         tts: ttsReady(env),
         search: searchReady(env),
+        page: pageReady(env),
         offline: liveReady(env) && (await usage.siteFull()) ? 'limit' : null,
       };
     },
@@ -98,6 +104,36 @@ export function createHandlers({ env = process.env, logDir = null, imagesDir, in
       const out = await images.get(prompt, String(scene || 'default'));
       if (out.error && !out.quiet) runLog.server('error', { where: 'image', message: out.error });
       return out;
+    },
+    // A free HTML page for a generated scene, written by the page model from { spec, design }.
+    // -> async iterator of raw HTML text (the browser sanitizes it) or an HttpError before it starts.
+    // The time limit ends the text early; the browser then keeps the block page.
+    async page(headers = {}, { spec, design } = {}, { signal } = {}) {
+      if (!pageReady(env)) throw new HttpError(503, 'no GEMINI_API_KEY');
+      const clean = validateSpec(spec);
+      if (!clean) throw new HttpError(400, 'spec has no usable blocks');
+      if (clean.urgency !== 'none') throw new HttpError(400, 'urgent pages are never sent to the page model');
+      await take('calls', headers);
+      const stop = new AbortController();
+      const timer = setTimeout(() => stop.abort(new Error('page timeout')), timeoutMs);
+      signal?.addEventListener('abort', () => stop.abort(signal.reason));
+      try {
+        const text = await streamPage({ spec: clean, design: String(design || '').slice(0, 600) }, env, { fetchImpl, signal: stop.signal });
+        return (async function* () {
+          try {
+            yield* text;
+          } catch (err) {
+            runLog.server('error', { where: 'page', message: stop.signal.aborted ? 'page timeout' : err.message });
+          } finally {
+            clearTimeout(timer);
+          }
+        })();
+      } catch (err) {
+        clearTimeout(timer);
+        const message = stop.signal.aborted ? 'page timeout' : err.message;
+        runLog.server('error', { where: 'page', message });
+        throw new HttpError(stop.signal.aborted ? 504 : 502, message);
+      }
     },
     async log(headers, { events } = {}) {
       return { written: runLog.browser(events) };

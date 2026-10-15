@@ -18,12 +18,24 @@ async function body(req) {
   return text ? JSON.parse(text) : {};
 }
 
-// fn(app, { headers, body }) -> JSON-able object, or { buffer, type } for binary.
-export function vercelFunction(fn, { method = null } = {}) {
+// Writes an async iterator of text as a plain-text stream. Plain text with nosniff: the page model's
+// raw HTML is never rendered at this origin; the browser sanitizes it into a shadow root.
+export async function streamText(res, pieces) {
+  res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+  for await (const piece of pieces) res.write(piece);
+  res.end();
+}
+
+// fn(app, { headers, body, signal }) -> JSON-able object, or { buffer, type } for binary.
+// With stream: true, fn returns an async iterator of text, sent as it comes (streamText).
+export function vercelFunction(fn, { method = null, stream = false } = {}) {
   return async (req, res) => {
     try {
       if (method && req.method !== method) throw new HttpError(405, 'method not allowed');
-      const out = await fn(handlers(), { headers: req.headers, body: method === 'POST' ? await body(req) : {} });
+      const left = new AbortController();
+      res.on?.('close', () => left.abort());
+      const out = await fn(handlers(), { headers: req.headers, body: method === 'POST' ? await body(req) : {}, signal: left.signal });
+      if (stream) return await streamText(res, out);
       res.setHeader('cache-control', 'no-store');
       if (Buffer.isBuffer(out)) {
         res.setHeader('content-type', 'audio/mpeg');
@@ -34,6 +46,7 @@ export function vercelFunction(fn, { method = null } = {}) {
       res.statusCode = 200;
       res.end(JSON.stringify(out));
     } catch (err) {
+      if (res.headersSent) return res.end();
       const status = err instanceof HttpError ? err.status : 500;
       if (status === 500) {
         console.error(`[api] ${req.url}: ${err.message}`);
