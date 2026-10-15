@@ -6,5 +6,6 @@ import flight from './flight.js';
 import training from './training.js';
 import generated from './generated.js';
 import secretary from './secretary.js';
+import memory from './memory.js';
 
-export const SCENES = { payment, shopping, flight, training, generated, secretary };
+export const SCENES = { payment, shopping, flight, training, generated, secretary, memory };

@@ -29,6 +29,19 @@ export function loadSaved() {
   }
 }
 
+// Remove one kept page (the memory page). Returns false when there was no such page.
+export function removeSaved(kind) {
+  const all = loadSaved();
+  if (!all || !Object.hasOwn(all, kind)) return false;
+  delete all[kind];
+  try {
+    localStorage.setItem(STORE, JSON.stringify(all));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // page: { html, design } of a model-written page, so a kept page reopens without a new model call.
 function saveScene(spec, page = {}) {
   if (spec.urgency && spec.urgency !== 'none') return false; // first-aid pages are never kept

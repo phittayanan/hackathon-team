@@ -47,6 +47,15 @@ export function forgetLearned() {
   } catch { /* nothing to forget */ }
 }
 
+// Forget one preference (the memory page). Returns false when there was no such line.
+export function forgetLearnedKey(key) {
+  const all = load();
+  const next = all.filter((l) => l.key !== key);
+  if (next.length === all.length) return false;
+  save(next);
+  return true;
+}
+
 // The {{learned}} text: one line per preference, newest first, "(2x)" when seen again.
 export function learnedText(all = load()) {
   return all.length ? all.map((l) => `${l.text}${l.n > 1 ? ` (${l.n}x)` : ''}`).join('; ') : 'nothing yet';
