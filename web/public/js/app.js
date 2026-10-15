@@ -41,6 +41,14 @@ function makeAgent(token) {
     open: (name, data) => alive() && openScene(name, data),
     // Same as the user saying it (chips and buttons on generated pages).
     request: (text) => alive() && handleUserText(text),
+    // A tap on a model-written page: the live agent hears it as a scene event; offline it is like saying the label.
+    event: (text, label) => {
+      if (!alive()) return;
+      logEvent('page_tap', { text });
+      if (!live.connected) return label && handleUserText(label);
+      if (label) showSubtitle(`“${label}”`, 1600);
+      sendText(`[scene event] ${text}`);
+    },
     close: () => alive() && closeScene(),
   };
 }

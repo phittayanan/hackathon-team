@@ -18,6 +18,16 @@ const PLAN_PARAM = {
   required: false,
 };
 
+// Optional on render_ui and revise_ui: a brief for the page model, which writes the page as free HTML.
+const DESIGN_PARAM = {
+  type: 'string',
+  description:
+    'A vivid 1-3 sentence brief for the page designer: purpose, mood, layout idea and what the user can tap, ' +
+    'for example "A sunny beach-postcard hero with the trip date huge, a timeline of the day below, a big Book button." ' +
+    'Make each page in the session look different. Never for urgent pages.',
+  required: false,
+};
+
 // Tool definitions, shared by the agent config (scripts/agent-sync.js) and the browser.
 // Parameters are kept flat (strings and enums) so any tool schema format can carry them;
 // structured data travels as a JSON string.
@@ -56,13 +66,13 @@ export const TOOL_DEFS = [
       'blocks:[...], proposals:[{id,label}]}. Block types: text{text} stat{label,value} progress{label,value 0-100 or "auto"} ' +
       'checklist{items:[{text,done,due,tag}]} list{items} card{title,text} chart{bars:[{label,value}]} field{label,placeholder} ' +
       'button{label} divider{} steps{items} call{label,number 1669|191|199} image{prompt,caption} (a short picture prompt; at most 2).  After it opens, ask if the user likes it and propose one or two changes ' +
-      '(unless urgent).',
-    params: { spec_json: { type: 'string', description: 'The UI spec as a JSON string', required: true }, plan: PLAN_PARAM },
+      '(unless urgent). With design, a design model then redraws the page as a free-form page in a few seconds.',
+    params: { spec_json: { type: 'string', description: 'The UI spec as a JSON string', required: true }, design: DESIGN_PARAM, plan: PLAN_PARAM },
   },
   {
     name: 'revise_ui',
     description: 'Redraw the open generated page with a changed spec (same format as render_ui), after the user asked for a change.',
-    params: { spec_json: { type: 'string', description: 'The full changed UI spec as a JSON string', required: true } },
+    params: { spec_json: { type: 'string', description: 'The full changed UI spec as a JSON string', required: true }, design: DESIGN_PARAM },
   },
   {
     name: 'mark_urgent',
@@ -106,6 +116,8 @@ const withSources = (spec, sources) =>
   !sources?.length || spec.blocks.some((b) => b.type === 'sources')
     ? spec
     : validateSpec({ ...spec, blocks: [...spec.blocks, { type: 'sources', items: sources }] }) || spec;
+
+const designOf = (design) => (typeof design === 'string' && design.trim() ? { design: design.trim().slice(0, 600) } : {});
 
 const parseJson = (text) => {
   if (text == null || text === '') return {};
@@ -242,7 +254,7 @@ function createScreenHandlers(ui, learn) {
       return `${action} done on ${open.name}`;
     },
 
-    async render_ui({ spec_json } = {}) {
+    async render_ui({ spec_json, design } = {}) {
       const parsed = parseJson(spec_json);
       // A kept page's reference: reopen the saved page as it was kept.
       if (typeof parsed?.saved === 'string') {
@@ -256,12 +268,12 @@ function createScreenHandlers(ui, learn) {
       spec = withSources(spec, sources);
       sources = [];
       passedOver();
-      await ui.openScene('generated', { spec });
+      await ui.openScene('generated', { spec, ...(spec.urgency === 'none' ? designOf(design) : {}) });
       if (spec.urgency === 'none') offered = { spec };
       return spec.urgency === 'none' ? 'page shown; now ask if the user likes it and propose one or two changes' : 'first-aid page shown';
     },
 
-    revise_ui({ spec_json } = {}) {
+    revise_ui({ spec_json, design } = {}) {
       const open = generated();
       if (!open) return 'error: no generated page is open';
       let spec = validateSpec(parseJson(spec_json));
@@ -269,7 +281,7 @@ function createScreenHandlers(ui, learn) {
       // A revise keeps the sources of the page it changes.
       const before = open.ctl.state?.().spec;
       spec = withSources(spec, before?.blocks.find((b) => b.type === 'sources')?.items);
-      ui.action('revise', { spec });
+      ui.action('revise', { spec, ...designOf(design) });
       // Learn what the user asked to change, for the next page like it.
       learn.noteRevise(before, spec);
       offered = null;

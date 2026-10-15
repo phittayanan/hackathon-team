@@ -5,9 +5,9 @@ import { sanitizePage, sanitizePartial, sanitizeCss, safePictureUrl, pageOk } fr
 const doc = (body, head = '') => `<!doctype html><html><head>${head}</head><body>${body}</body></html>`;
 
 test('keeps allowed tags, classes and data-action; wraps the body', () => {
-  const out = sanitizePage(doc('<section class="hero"><h1>สวัสดี</h1><button data-action="go" data-value="a">ไป</button></section>'));
+  const out = sanitizePage(doc('<section class="hero"><h1>สวัสดี</h1><button data-action="go" data-value="a" aria-label="ไปเลย">ไป</button></section>'));
   assert.equal(out.complete, true);
-  assert.match(out.html, /<div class="pg-body"><section class="hero"><h1>สวัสดี<\/h1><button data-action="go" data-value="a" type="button">ไป<\/button><\/section><\/div>$/);
+  assert.match(out.html, /<div class="pg-body"><section class="hero"><h1>สวัสดี<\/h1><button data-action="go" data-value="a" aria-label="ไปเลย" type="button">ไป<\/button><\/section><\/div>$/);
   assert.equal(pageOk(sanitizePage(doc('<p>ข้อความที่ยาวพอสำหรับหน้าเว็บนี้แน่นอน</p>'))), true);
 });
 
@@ -67,5 +67,6 @@ test('body class and style move to the wrapper; svg keeps its case', () => {
   const { html } = sanitizePage(doc('<svg viewBox="0 0 10 10"><linearGradient id="g"><stop offset="0" stop-color="red"/></linearGradient><circle cx="5" cy="5" r="4" fill="url(#g)"/></svg>').replace('<body>', '<body class="night" style="color:white" onload="x()">'));
   assert.match(html, /<div class="pg-body night" style="color:white">/);
   assert.match(html, /<svg viewBox="0 0 10 10"><linearGradient id="g">/);
+  assert.match(html, /<stop offset="0" stop-color="red"\/><\/linearGradient><circle cx="5" cy="5" r="4" fill="url\(#g\)"\/><\/svg>/);
   assert.ok(!html.includes('onload'));
 });

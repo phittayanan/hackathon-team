@@ -82,7 +82,7 @@ function cleanAttrs(tag, rawAttrs) {
   let m;
   while ((m = re.exec(rawAttrs))) {
     const name = m[1].toLowerCase();
-    if (seen.has(name) || !ATTRS.has(name) || name.startsWith('on')) continue;
+    if (seen.has(name) || !(ATTRS.has(name) || /^aria-[a-z]+$/.test(name)) || name.startsWith('on')) continue;
     seen.add(name);
     let value = decode(m[2] ?? m[3] ?? m[4] ?? '');
     if (name === 'src') {
@@ -155,7 +155,9 @@ export function sanitizePage(raw) {
       if (!VOID.has(name)) body += `</${tag}>`;
       continue;
     }
-    body += `<${tag}${cleanAttrs(name, m[2] || '')}>`;
+    // In SVG, "/>" closes the element (a <circle/> must not swallow the next one).
+    const selfClose = SVG_TAGS.includes(name) && m[0].endsWith('/>');
+    body += `<${tag}${cleanAttrs(name, m[2] || '')}${selfClose ? '/>' : '>'}`;
   }
 
   // The body's own class and style move to the wrapper.
