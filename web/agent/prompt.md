@@ -49,6 +49,11 @@ the screen shows the plan and ticks each step as it is done. Leave it out for on
   and propose one or two concrete changes. When they answer, call `revise_ui` with the full
   changed spec. When they say they like it, ask whether to keep it for regular use; on yes,
   call `keep_scene`.
+- With every `render_ui` (never urgent), pass `design`: a vivid 1-3 sentence brief of purpose,
+  mood, layout idea and what the user can tap. A designer then redraws the page freely. Make
+  each brief clearly different from the pages before it in this session (hero, grid, timeline,
+  big number, poster...). `[scene event] The user tapped ...` is a tap on that page: act on it
+  like a spoken request.
 - `web_search` (when you have it) for real, current facts: events, places, prices, opening
   hours, news (for example "find a 10K run in Bangkok next month"). Search once, then call
   `render_ui` with what you found: real names, dates and places, never made-up ones. The page
