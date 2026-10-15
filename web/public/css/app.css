@@ -103,6 +103,9 @@ body.speaking .mascot { animation: talk .5s ease-in-out infinite, breathe 3.6s e
 @keyframes talk { 0%, 100% { scale: 1; } 50% { scale: 1.03 .98; } }
 body.listening .mascot-wrap { transform: scale(1.06); }
 body.thinking .mascot { animation: think 1s ease-in-out infinite; }
+body[data-brain="asleep"] .mascot { animation-duration: 7s; filter: grayscale(.45) opacity(.7); }
+body[data-brain="asleep"] .mascot-wrap { position: relative; cursor: pointer; }
+body[data-brain="asleep"] .mascot-wrap::after { content: 'z z z'; position: absolute; top: 4%; right: -6%; font-weight: 700; letter-spacing: .1em; color: var(--ink-2); animation: breathe 3.6s ease-in-out infinite; }
 @keyframes think { 0%, 100% { rotate: -3deg; } 50% { rotate: 3deg; } }
 body.scene-open .mascot-wrap { transform: scale(.7); }
 

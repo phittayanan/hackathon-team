@@ -312,6 +312,10 @@ function setupMic(fallback) {
     if (live.connected) setMic(false);
     else listener?.stop();
   };
+  // Asleep (the session ended for idle or time): a tap on the mascot wakes the agent too.
+  $('mascotWrap').addEventListener('click', () => {
+    if (document.body.dataset.brain === 'asleep') startLive(toolUi).catch(() => {});
+  });
   mic.addEventListener('pointerdown', start);
   mic.addEventListener('pointerup', stop);
   mic.addEventListener('pointerleave', stop);

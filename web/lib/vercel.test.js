@@ -29,14 +29,14 @@ test('handlers check the daily limit before any ElevenLabs call, and say offline
   globalThis.fetch = async () => { called = true; throw new Error('no network in tests'); };
   try {
     assert.deepEqual(await app.session({}), { live: false, reason: 'daily site limit reached', offline: 'limit' });
-    for (const run of [() => app.tts({}, { text: 'x' }), () => app.image({}, { prompt: 'x' })]) {
-      await assert.rejects(run, (err) => err.status === 429 && err.extra.offline === 'limit');
-    }
+    await assert.rejects(() => app.tts({}, { text: 'x' }), (err) => err.status === 429 && err.extra.offline === 'limit');
+    // Pictures are made ahead of time (no ElevenLabs call), so the limit does not stop them.
+    assert.deepEqual(await app.image({}, { prompt: 'x' }), { url: '/pics/default.png' });
   } finally {
     globalThis.fetch = realFetch;
   }
   assert.equal(called, false);
-  assert.deepEqual(await app.health(), { brain: 'elevenlabs-agent', tts: true, search: false, offline: 'limit' });
+  assert.deepEqual(await app.health(), { brain: 'elevenlabs-agent', tts: true, search: false, page: false, offline: 'limit' });
 });
 
 test('ElevenLabs out of credit -> offline: credit', async () => {

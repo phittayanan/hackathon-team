@@ -106,3 +106,9 @@ test('knowledge base: the fact sheet is attached only with an id; prompt mode by
   assert.match(knowledgeHash(text), /^[0-9a-f]{12}$/);
   assert.notEqual(knowledgeHash(text), knowledgeHash(`${text} `));
 });
+
+test('session limits: at most 3 minutes, and the call ends after 20 s without the user', () => {
+  const c = agentConfig().conversation_config;
+  assert.equal(c.conversation.max_duration_seconds, 180);
+  assert.equal(c.turn.silence_end_call_timeout, 20);
+});

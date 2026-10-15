@@ -3,8 +3,9 @@
 // When the limit is reached, or ElevenLabs says the credit ran out, the answer carries
 // `offline: 'limit' | 'credit'` and the page switches to its offline brain by itself.
 import { route } from './router.js';
-import { elevenTts, ttsReady } from './tts.js';
-import { liveReady, signedUrl, today } from './live-session.js';
+import { elevenTts } from './tts.js';
+import { signedUrl, today } from './live-session.js';
+import { createAccounts, envFor } from './accounts.js';
 import { createImageService } from './images.js';
 import { createRunLog, createConsoleLog } from './runlog.js';
 import { createUsage, LimitError } from './usage.js';
@@ -23,12 +24,15 @@ export class HttpError extends Error {
 
 export const errorBody = (err) => ({ error: err.message, ...(err.extra || {}) });
 
-// opts: { env, logDir (local JSONL) | console log, imagesDir, inlineImages (Vercel: no disk cache), usage,
+// opts: { env, logDir (local JSONL) | console log, imagesDir, inlineImages (Vercel: no disk cache), usage, accounts,
 //         fetchImpl and timeoutMs for the page model (tests) }
 export function createHandlers({
-  env = process.env, logDir = null, imagesDir, inlineImages = false, usage = createUsage({ env }), fetchImpl = fetch, timeoutMs = PAGE_TIMEOUT_MS,
+  env = process.env, logDir = null, imagesDir, inlineImages = false, usage = createUsage({ env }), accounts = createAccounts({ env }),
+  fetchImpl = fetch, timeoutMs = PAGE_TIMEOUT_MS,
 } = {}) {
   const runLog = logDir ? createRunLog(logDir) : createConsoleLog();
+  const liveReady = () => accounts.ready();
+  const ttsReady = () => accounts.ready();
   const images = createImageService({ env, dir: imagesDir, inline: inlineImages });
   // Counts one use; over the limit -> 429 with offline: 'limit'.
   const take = async (kind, headers) => {
@@ -51,22 +55,26 @@ export function createHandlers({
     usage,
     async health() {
       return {
-        brain: liveReady(env) ? 'elevenlabs-agent' : 'keywords',
-        tts: ttsReady(env),
+        brain: liveReady() ? 'elevenlabs-agent' : 'keywords',
+        tts: ttsReady(),
         search: searchReady(env),
         page: pageReady(env),
-        offline: liveReady(env) && (await usage.siteFull()) ? 'limit' : null,
+        offline: !liveReady() ? null : (await usage.siteFull()) ? 'limit' : (await accounts.allEmpty()) ? 'credit' : null,
       };
     },
+    // x-agentos-spent: the account id of a live call that ElevenLabs just cut for credit (the page
+    // sees that, the server does not); that account is marked empty before the next one is picked.
     async session(headers = {}) {
-      if (!liveReady(env)) return { live: false, reason: 'no ELEVENLABS_API_KEY or ELEVENLABS_AGENT_ID' };
+      if (!liveReady()) return { live: false, reason: 'no ELEVENLABS_API_KEYS or ELEVENLABS_API_KEY' };
+      const spent = headers['x-agentos-spent'];
+      if (spent && (await accounts.markEmpty(String(spent), 'live call'))) runLog.server('error', { where: 'live call', message: 'account out of credit', account: String(spent), outOfCredit: true });
       try {
         await take('sessions', headers);
       } catch (err) {
         return { live: false, reason: err.message, offline: 'limit' };
       }
       try {
-        return { live: true, signedUrl: await signedUrl(env), today: today() };
+        return await accounts.run('agent', async (a) => ({ live: true, signedUrl: await signedUrl(envFor(env, a)), today: today(), account: a.id }), 'signed url');
       } catch (err) {
         if (err.outOfCredit) {
           outOfCredit(err, 'signed url');
@@ -78,10 +86,10 @@ export function createHandlers({
     },
     route: async ({ text, context, spec, stage, saved } = {}) => route(text, context || null, { spec, stage, saved }),
     async tts(headers = {}, { text } = {}) {
-      if (!ttsReady(env)) throw new HttpError(503, 'no ElevenLabs key');
+      if (!ttsReady()) throw new HttpError(503, 'no ElevenLabs key');
       await take('calls', headers);
       try {
-        return await elevenTts(String(text).slice(0, 400), env);
+        return await accounts.run('key', (a) => elevenTts(String(text).slice(0, 400), envFor(env, a)), 'tts');
       } catch (err) {
         throw err.outOfCredit ? outOfCredit(err, 'tts') : err;
       }
@@ -99,8 +107,8 @@ export function createHandlers({
         return { error: message };
       }
     },
+    // A picture made ahead of time (lib/images.js): no paid call, so no daily-limit count.
     async image(headers = {}, { prompt, scene } = {}) {
-      if (env.ELEVENLABS_API_KEY && !images.unavailable()) await take('calls', headers);
       const out = await images.get(prompt, String(scene || 'default'));
       if (out.error && !out.quiet) runLog.server('error', { where: 'image', message: out.error });
       return out;
