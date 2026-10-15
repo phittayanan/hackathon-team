@@ -8,6 +8,7 @@ import { showSubtitle, setLiveVoice } from './voice.js';
 import { logEvent } from './log.js';
 import { apiFetch, goOffline, onOffline, micBlocked } from './api.js';
 import { sessionVariables } from './memory.js';
+import { noteHeard } from './learn.js';
 import { MAX_SESSION_SECONDS, IDLE_END_SECONDS } from './session-limits.js';
 
 // @elevenlabs/client, pinned. jsDelivr's +esm build is one self-contained ES module.
@@ -260,6 +261,7 @@ export function startLive(ui) {
         } else {
           showSubtitle(`“${message}”`, 1400);
           logEvent('stt', { text: message, final: true });
+          noteHeard(message);
           noteUser();
         }
       },
