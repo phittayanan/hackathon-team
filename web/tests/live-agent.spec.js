@@ -170,6 +170,33 @@ test('live: a new session after the old one ended hears which page is open and w
   await expect.poll(() => page.evaluate(() => window.__conv.context.join('\n'))).toMatch(/\[screen\] The payment page is open: Payment request to FreshMart Online, total ฿849\. Rules:/);
 });
 
+test('live: catalog results, the search error and the choose tap reach the agent', async ({ page }) => {
+  const item = (id, title, seller, amount) => ({ id, title, seller, amount, currency: 'THB', description: 'Wireless', url: `https://merchant.example/${id}`, image: null });
+  let calls = 0;
+  await page.route('**/api/catalog', (r) => r.fulfill({ json: ++calls === 1
+    ? { products: [item('a', 'Buds A', 'Shop One', 129000), item('b', 'Buds B', 'Shop Two', 99000)] }
+    : { error: 'Shopify rate limited' } }));
+  await liveHome(page);
+  expect(await tool(page, 'open_scene', { scene: 'shopping', data_json: JSON.stringify({ catalog: true, query: 'หูฟัง', budget: 1500 }) }))
+    .toBe('opened shopping: Shopify product search for "หูฟัง", budget ฿1500: searching.');
+  await expect(page.locator('.catalog-product')).toHaveCount(2);
+  // Results arrive as silent context, so "อันไหนถูกสุด" has an answer.
+  await expect.poll(() => page.evaluate(() => window.__conv.context.find((t) => t.startsWith('[screen] Catalog results')) || ''))
+    .toBe('[screen] Catalog results: Shopify product search for "หูฟัง", budget ฿1500: 2 results: 1. Buds A (Shop One) ฿1,290.00; 2. Buds B (Shop Two) ฿990.00. Choosing is not buying.');
+  expect(await page.evaluate(() => window.__conv.sent.some((t) => t.includes('Catalog results')))).toBe(false);
+
+  // The choose tap is an event the agent hears.
+  await page.getByRole('button', { name: 'เลือกรายการนี้' }).nth(1).click();
+  await expect.poll(() => page.evaluate(() => window.__conv.sent.find((t) => t.startsWith('[scene event]')) || ''))
+    .toBe('[scene event] The user chose "Buds B" from Shop Two at ฿990.00 on the catalog page. Choosing is not buying; nothing was ordered.');
+
+  // A failed search is told too.
+  await page.getByRole('button', { name: 'ค้นสินค้า', exact: true }).click();
+  await expect(page.locator('.scene-shopping [role=status]')).toContainText('Shopify rate limited');
+  await expect.poll(() => page.evaluate(() => window.__conv.context.find((t) => t.startsWith('[screen] Catalog search failed')) || ''))
+    .toBe('[screen] Catalog search failed: Shopify product search for "หูฟัง", budget ฿1500: the search failed: Shopify rate limited.');
+});
+
 test('live: typed text goes to the agent, and feed changes arrive as contextual updates', async ({ page }) => {
   await liveHome(page);
   await page.fill('#fallbackInput', 'this week is hectic');
