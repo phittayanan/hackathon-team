@@ -161,20 +161,23 @@ measure microphone accuracy; replay selected cases by actual Thai speech later.
 
 ## Baseline status
 
-An initial exploratory D08 run failed email grounding. After the user supplied
-a new key and requested `agent:sync`, three development cases were run against
-the newly synced agent with a recorded config fingerprint: D08 and D10 passed,
-while D02 failed because it spoke a meeting start time of 14:30 instead of the
-tool's 14:00. The earlier email error did not recur in the single synced D08
-run; this is not proof of a fix. See [baseline.md](baseline.md) for evidence.
-The other 17 development cases and all 10 held-out cases remain pending;
-there is no overall behavioral pass rate or readiness claim.
+The initial baseline found an invented email fact and intermittent appointment
+time errors. This change now returns the displayed email in tool data, separates
+`proposedMeeting` from current `events`, and instructs the agent to preserve
+exact times and refresh state before reporting appointment changes.
+
+After syncing that change, D02 passed three independent real-agent sessions and
+D08 passed one. All four conversations were confirmed by the provider and used
+the same recorded agent version. This is promising evidence for the specific
+time/email problem, not a general accuracy claim. See [baseline.md](baseline.md)
+for before/after evidence. For the current fix, 18 other development cases and
+all 10 held-out cases remain pending; there is no overall behavioral pass rate
+or readiness claim. Earlier-version scores are not carried over.
 
 Code-test and dataset validation passes must not be reported as assistant task
 success. Known limits
 to measure include fixed secretary draft times, 1/5-minute snooze only, no
 general calendar writes, no real email, and catalog results not returned to
-the conversational model. Prioritize accurate appointment times from tool data,
-then returning actual email content and separating it from notifications.
-Measure changes against D02/D08 and repeat critical cases before claiming an
-improvement.
+the conversational model. Next, run the remaining development cases on this
+version, starting with D10/D11 to check the sending boundary and the refreshed
+state after an owner tap. Freeze changes before the held-out evaluation.

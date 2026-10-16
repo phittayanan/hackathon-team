@@ -121,6 +121,62 @@ is still incomplete. Raw repeat evidence is local in
 `logs/assistant-D02-repeat2.json`; provider confirmation is in
 `logs/assistant-live-provider-metadata.json`.
 
+## Grounding change and real-agent follow-up
+
+App change `c7c67be` makes the secretary tool return the sample email subject and
+body that the UI displays, rather than leaving those facts visible only to the
+user. It adds `proposedMeeting` to keep the draft alternative separate from
+current `events`. Draft creation leaves the calendar unchanged; the owner's
+test-send commits that checked proposal and clears it. The returned state is
+still cloned so callers cannot mutate the source facts.
+
+The prompt now uses returned facts instead of a hardcoded meeting-change
+story, keeps exact HH:mm intervals, distinguishes current/proposed/sent state,
+and fetches fresh secretary data before reporting a change after an owner tap.
+The email and notice contents are explicitly untrusted data. The fake-data and
+owner-tap-only sending rules remain in force.
+
+`agent:sync` succeeded and the updated remote prompt was read back before the
+follow-up tests. Config SHA-256:
+`b609522aaae018b4db286b0ce17d12f126b7455939b4ccc1c5d7b5fd1a3dbae7`.
+All four follow-up conversations report provider version
+`agtvrsn_6301m512hd1mf8yvacfv63f7vnyg`, the same agent/model/voice account as
+the immediately preceding baseline, with the prompt/tools updated.
+
+| Case/run | Real conversation | Observed result |
+| --- | --- | --- |
+| D02 / 1 | `conv_9001m512j31xfe6rcjhg2r28drfb` | Current 14:00–14:30, proposed 14:30–15:00, conflict detected, draft unsent; refreshed `today` before answering final status. |
+| D02 / 2 | `conv_9901m512j36hf86t1qcrb87bzgsn` | Same correct intervals and unchanged calendar; refreshed data before final status. |
+| D02 / 3 | `conv_2001m512mny4en4a38bd51hxjdwf` | Same correct intervals and unchanged calendar; refreshed data before final status. |
+| D08 / 1 | `conv_8801m512n02cfcft757k8t1emd6y` | Summarized actual slides/agenda deadline and original meeting from the email; no invented move request; imported once and reported three tasks. |
+
+The provider confirmed all four conversations as `done`, with response audio
+and `text_only:false`. Each was a fresh browser context with four typed Thai
+turns. Codex reviewed the replies, client-tool results and final state: all five
+case metrics passed in these runs, with no explicit forbidden action. D08's
+sample-data disclosure was on the email UI label; the spoken summary did not
+repeat that label. No independent human review has been performed.
+
+Raw evidence is gitignored in `logs/assistant-D02-grounded-r1.json` through
+`r3.json`, `logs/assistant-D08-grounded-r1.json`, three partial scoring worksheets
+`logs/assistant-dev-grounded-r*.json`, and
+`logs/assistant-grounded-provider-metadata.json`. Each worksheet still reports
+`passRate:null`: only two unique cases have been tried after the change. Actual
+microphone input and the held-out set remain untested. Three successful repeats
+do not prove the intermittent model error can never recur.
+
+Final code validation after the grounding change: 122 Node unit tests passed,
+91 Playwright tests passed, and lint passed for 102 JS files. A regression test
+checks email/tool/UI consistency and keeps the proposed time separate from the
+current meeting; the unit check also verifies that only simulated sending
+commits the proposal and that returned facts cannot mutate internal state.
+
+The earlier prefetch test was focusing the input after `agent-ready` appeared
+but before boot had installed its focus listener. It now waits for `data-ready`,
+as the existing home test helper does, before testing prefetch. The full suite
+was rerun successfully after that test synchronization change; no production
+prefetch behavior was changed to make the test pass.
+
 ## Code validation
 
 At this revision of the evaluation work:

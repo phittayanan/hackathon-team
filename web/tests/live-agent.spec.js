@@ -225,6 +225,7 @@ test('live speed: the SDK loads at boot, the signed URL is fetched on the first 
   await expect.poll(() => sdkLoaded).toBe(true);
   expect(sessions).toBe(0); // page load alone spends no session
   await revealHome(page);
+  await expect(page.locator('body')).toHaveAttribute('data-ready', '1');
   await page.locator('#fallbackInput').focus();
   await expect.poll(() => sessions).toBe(1);
   await page.fill('#fallbackInput', 'this week is hectic');
