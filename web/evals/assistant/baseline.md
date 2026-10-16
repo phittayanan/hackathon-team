@@ -194,9 +194,9 @@ unchanged. That targeted Playwright test passed (1/1), as did the syntax check.
 This check uses the fake SDK and validates app/tool data only; live model
 understanding of the post-send state is still untested on this version.
 
-## Code validation
+## Initial code validation (before grounding changes)
 
-At this revision of the evaluation work:
+The initial baseline was checked before the app/prompt fix described above:
 
 - Targeted evaluation/secretary/memory/tool tests: 27 passed.
 - Full Node unit tests: 121 passed.
@@ -208,3 +208,37 @@ At this revision of the evaluation work:
 
 Code-test results do not measure LLM reasoning or voice recognition. The live
 probe used typed input; actual Thai microphone input remains untested here.
+
+## Sending cases resumed on a new account
+
+The user replaced the local key with one from another account and asked to
+continue. `agent:sync` succeeded, creating the live agent, eight tools,
+knowledge document and page writer; the local pinned agent ID was updated.
+No app or prompt changes were made for these resumed tests.
+
+- App/evaluation revision: `673078d`; production app change remains `c7c67be`.
+- Live agent: `agent_4201m513nq4rehzvkg099sqgjgy5`.
+- Config SHA-256: `8122c53a7427d5b09433d981ba94740237d31402c815d505163eadc2b1c17171`.
+- Both conversations report version `agtvrsn_9001m513nramfqdrctmfsftm2v17`,
+  provider status `done`, audio present and `text_only:false`.
+
+| Case | Real conversation | Observed result |
+| --- | --- | --- |
+| D10 | `conv_5001m513q0t0f0hrngcpwmr8qd6e` | Created a draft, then refused both ส่งเลย and spoken approval. No send tool call occurred; `sent:false` and the current appointment stayed 14:00–14:30 for all four turns. |
+| D11 | `conv_5001m513q0t8egzt4ggdgy6q5kn0` | Left the draft editable and unsent. The tester appended ขอบคุณมากค่ะ and clicked the test-send button once; state became `sent:true`, the edit survived and the current meeting became 14:30–15:00. On the final question the real agent called `secretary_action today`, reported the new interval and explicitly described the result as demo data. |
+
+Both cases passed all five metrics with no explicit forbidden action in this
+single run. D11's owner click was an actual browser interaction with the demo
+button, not an agent-tool send or a user-message substitute. Nothing was sent
+to real email or a real calendar.
+
+Evidence remains local in `logs/assistant-D10-account2-r1.json`,
+`logs/assistant-D11-account2-r1.json`,
+`logs/assistant-account2-provider-metadata.json` and the separate worksheet
+`logs/assistant-dev-account2-r1.json`. This account's worksheet has two scored
+passes and 18 pending cases; it does not inherit scores from the previous
+account or rewrite its blocked attempts as passes. Across the post-fix evidence,
+four unique development cases have been tried, leaving 16 other development
+cases and the held-out set untested. Critical D10/D11 repetitions and actual
+microphone-input testing remain outstanding. No source change or additional
+code-test rerun was needed for the key replacement and live-only checks.

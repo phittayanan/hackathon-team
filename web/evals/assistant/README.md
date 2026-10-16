@@ -170,19 +170,23 @@ After syncing that change, D02 passed three independent real-agent sessions and
 D08 passed one. All four conversations were confirmed by the provider and used
 the same recorded agent version. This is promising evidence for the specific
 time/email problem, not a general accuracy claim. See [baseline.md](baseline.md)
-for before/after evidence. For the current fix, 18 other development cases and
-all 10 held-out cases remain pending; there is no overall behavioral pass rate
-or readiness claim. Earlier-version scores are not carried over.
+for before/after evidence. A subsequent account with available credit also
+passed D10 and D11 once each, including refreshing model state after the owner's
+test-send. Four unique development cases have now been exercised after the fix
+across the two recorded account configurations; 16 development cases and all
+10 held-out cases remain untested. Worksheets stay separate by configuration,
+with no overall behavioral pass rate or readiness claim. Earlier-version
+scores are not carried over.
 
 Code-test and dataset validation passes must not be reported as assistant task
 success. Known limits
 to measure include fixed secretary draft times, 1/5-minute snooze only, no
 general calendar writes, no real email, and catalog results not returned to
 the conversational model. Next, run the remaining development cases on this
-version. D10/D11 live attempts were subsequently blocked before their first
-turn by the provider's `quota_exceeded` response. They have no behavioral
-scores. The browser regression independently verifies that an owner test-send
-preserves edited text and that a fresh tool call reports the new appointment;
-it uses the fake SDK and is not a replacement for live model evaluation.
-Resume those cases when provider credit is available, then freeze changes
-before the held-out evaluation.
+version. Initial D10/D11 attempts were blocked by `quota_exceeded` and remain
+unscored in that account's worksheet. After the user replaced the key, both
+cases passed on the newly synced account in a separate worksheet; the old
+blocked records were preserved. The browser regression also independently
+checks owner edits and refreshed appointment data with its fake SDK. Next,
+repeat critical D10/D11 cases, then continue the other development scenarios
+before freezing changes for the held-out evaluation.
