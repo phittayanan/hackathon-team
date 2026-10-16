@@ -66,7 +66,9 @@ const BLIND_WORDS = /มองไม่เห็น|ไม่เห็น(หน
 // A page counts as just shown for this long: a "no" after that is about something else.
 export const REJECT_WINDOW_MS = 60000;
 
-export const isRejection = (text) => REJECT_WORDS.test(String(text || '').replace(/^\s*no\s+(?:problems?|worries)\b[\s,.!;:]*/i, ''));
+export const isRejection = (text) => REJECT_WORDS.test(String(text || '')
+  .replace(/^\s*no\s+(?:problems?|worries)\b[\s,.!;:]*/i, '')
+  .replace(/ไม่(?:ได้)?(?:ผิด|แย่)|\bnot\s+(?:(?:really|very|that)\s+)?(?:wrong|ugly|terrible|awful)\b/gi, ' '));
 export const saysBlind = (text) => BLIND_WORDS.test(String(text || ''));
 export const isToolError = (result) => /^error:/.test(String(result || ''));
 export const isLayoutFailure = (note) => String(note || '').startsWith('[screen] The designed page was replaced');

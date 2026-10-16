@@ -90,11 +90,30 @@ const BLOCK_WORDS = {
 const DUE_WORDS = /\bdue\b|deadline|\bdates?\b|กำหนดส่ง|ครบกำหนด|เดดไลน์|วันที่/i;
 const TAG_WORDS = /\btags?\b|\blabels?\b|แท็ก|ป้าย/i;
 
+// Keep shared negation over "dates or tags"; a new command starts its own intent.
+function affirmativeWish(wish, words) {
+  if (!words) return false;
+  const negative = /\b(?:not|never|no|don't|don’t|cannot|can't|can’t|remove|drop|delete|omit|leave|without|avoid|unnecessary)\b|อย่า|ห้าม|ไม่|ลบ|ตัด/i;
+  const clauses = wish.split(/[,;.!?\n]|\b(?:but|then)\b|แต่|แล้ว|\band\s+(?=(?:add|include|insert|show|give|make|change|keep|retain)\b)|และ\s*(?=เพิ่ม|ใส่|ขอ|เปลี่ยน)/i)
+    .flatMap((clause) => clause.split(/\s+(?=(?:add|include|insert|show|give|make|change|remove|drop|delete|omit|without|keep|retain)\b|เพิ่ม|ใส่|ขอ|เปลี่ยน|ไม่เอา|เอา|ลบ|ตัด)/i).reduce((parts, part) => {
+      // Modifiers, extra spaces and shared "or" do not end a negative command.
+      if (parts.length && negative.test(parts.at(-1))) parts[parts.length - 1] += ` ${part}`;
+      else parts.push(part);
+      return parts;
+    }, []));
+  const matches = clauses.map((clause) => {
+    const match = words.exec(clause);
+    if (!match) return null;
+    return !negative.test(clause) && !/\b(?:keep|retain)\b|เก็บ|คงไว้/i.test(clause);
+  }).filter((match) => match !== null);
+  return matches.includes(true) && !matches.includes(false);
+}
+
 // shortcut: only direct commands in simple clauses; skip ambiguous wording until richer intent is needed.
 function blockDirection(wish, type) {
   if (!BLOCKS[type]) return '';
   const noun = `(?:${BLOCK_WORDS[type].source})`;
-  const object = `(?:(?:a|an|the|some)\\s+)?${noun}(?!['’]s\\b|\\s+(?:colou?r|style|title|size|border|background|shadow|legend|labels?|axes|axis)\\b)`;
+  const object = `(?:(?:a|an|the|some)\\s+)?${noun}(?!['’]s\\b|\\s+(?:colou?r|style|title|heading|size|border|background|shadow|legend|labels?|axes|axis)\\b)`;
   const add = new RegExp(`\\b(?:add|include|insert|show)\\s+${object}|(?:เพิ่ม|ใส่)\\s*${noun}|ขอ\\s*${noun}(?:สรุป)?ด้วย`, 'i');
   const remove = new RegExp(`\\b(?:remove|drop|delete|omit)\\s+${object}|\\btake\\s+${object}\\s+out\\b|(?:ลบ|ตัด|ไม่เอา)\\s*${noun}|เอา\\s*${noun}\\s*ออก`, 'i');
   // Expand a shared verb only for positive commands: "add due dates and a progress bar".
@@ -105,6 +124,8 @@ function blockDirection(wish, type) {
   const directions = new Set();
   for (const clause of wish.split(/[,;.!?\n]|\b(?:and|but|then)\b|และ|แต่|แล้ว/i)) {
     if (!BLOCK_WORDS[type].test(clause)) continue;
+    // Thai can name the part before the component or after "ออกแค่".
+    if (/เส้นขอบ|หัวข้อ|หัวเรื่อง|คำอธิบาย|พื้นหลัง|แกน/.test(clause)) continue;
     // A negated command or a request to keep this component is not an add/remove preference.
     if (/\b(?:not|never|no|keep|retain)\b|\b(?:don't|don’t|cannot|can't|can’t)\b|อย่า|ห้าม|เก็บ|คงไว้|ไม่(?!เอา)|ไม่เอา.*ออก/i.test(clause)) return '';
     if (add.test(clause)) directions.add('+');
@@ -127,9 +148,9 @@ export function reviseLessons(before, after, wish = '') {
   const now = types(after);
   for (const t of now) if (!was.has(t) && blockDirection(said, t) === '+') out.push({ key: `${kind}:+${t}`, text: `${name} pages: add ${BLOCKS[t]}` });
   for (const t of was) if (!now.has(t) && blockDirection(said, t) === '-') out.push({ key: `${kind}:-${t}`, text: `${name} pages: leave out ${BLOCKS[t]}` });
-  if (!uses(before, 'due') && uses(after, 'due') && DUE_WORDS.test(said)) out.push({ key: `${kind}:due`, text: `${name} pages: give checklist items due dates` });
-  if (!uses(before, 'tag') && uses(after, 'tag') && TAG_WORDS.test(said)) out.push({ key: `${kind}:tag`, text: `${name} pages: tag checklist items` });
-  if (after.accent && before.accent !== after.accent && SPEC_ACCENT_WORDS[after.accent]?.test(said)) out.push({ key: `${kind}:accent`, text: `${name} pages: ${after.accent} colour` });
+  if (!uses(before, 'due') && uses(after, 'due') && affirmativeWish(said, DUE_WORDS)) out.push({ key: `${kind}:due`, text: `${name} pages: give checklist items due dates` });
+  if (!uses(before, 'tag') && uses(after, 'tag') && affirmativeWish(said, TAG_WORDS)) out.push({ key: `${kind}:tag`, text: `${name} pages: tag checklist items` });
+  if (after.accent && before.accent !== after.accent && affirmativeWish(said, SPEC_ACCENT_WORDS[after.accent])) out.push({ key: `${kind}:accent`, text: `${name} pages: ${after.accent} colour` });
   return out;
 }
 
@@ -183,7 +204,7 @@ export function styleChanges(before, after, wish = '', profile = styleProfile())
     const hit = WISHES.find(([k, , re]) => k === key && re.test(text));
     if (hit) next[key] = step(key, profile[key], hit[1]);
   }
-  const accent = ACCENT_WORDS.find(([, re]) => re.test(text));
+  const accent = ACCENT_WORDS.find(([, re]) => affirmativeWish(text, re));
   if (accent) next.accent = accent[0];
   if (CONTRAST_WORDS.test(text)) next.contrast = 'high';
   // Share the block lesson's direction check so the profile cannot learn the opposite wish.

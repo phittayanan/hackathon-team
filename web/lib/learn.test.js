@@ -12,6 +12,59 @@ beforeEach(() => {
 
 const todo = (blocks, extra = {}) => ({ kind: 'todo', name: 'To-do list', accent: 'orange', blocks, ...extra });
 
+test('noteRevise does not learn negated due dates, tags or accents', () => {
+  const before = todo([{ type: 'checklist', items: [{ text: 'Run' }] }, { type: 'chart', bars: [] }]);
+  const after = todo([{ type: 'checklist', items: [{ text: 'Run', due: 'Mon', tag: 'sport' }] }], { accent: 'green' });
+  for (const text of ["don't add due dates or tags", 'อย่าใส่วันที่หรือแท็ก', 'do not make it green', 'อย่าเปลี่ยนเป็นสีเขียว', 'อย่าใส่วันที่หรือแท็ก อย่าเปลี่ยนเป็นสีเขียว', 'due dates should not be added', 'วันที่ไม่ต้องเพิ่ม', 'keep the colour green', 'tags are unnecessary']) {
+    assert.deepEqual(noteRevise(before, after, text), [], text);
+    assert.deepEqual(learned(), [], text);
+    assert.deepEqual(styleProfile(), STYLE_DEFAULT, text);
+  }
+  for (const text of ['leave due dates and tags out', 'leave green out', "don't add due dates or make it green", "don't automatically add due dates or tags", 'do not  add due dates', 'อย่าเพิ่ง ใส่วันที่']) {
+    assert.deepEqual(noteRevise(before, after, text), [], text);
+    assert.deepEqual(styleProfile(), STYLE_DEFAULT, text);
+  }
+});
+
+test('affirmative clauses independently teach dates, tags and colour', () => {
+  const before = todo([{ type: 'checklist', items: [{ text: 'Run' }] }]);
+  const after = todo([{ type: 'checklist', items: [{ text: 'Run', due: 'Mon', tag: 'sport' }] }], { accent: 'green' });
+  const cases = [
+    ["don't add due dates but add tags", ['todo:tag']],
+    ["don't add due dates and add tags", ['todo:tag']],
+    ['อย่าใส่วันที่ แต่ใส่แท็ก', ['todo:tag']],
+    ["don't add tags, give each a date", ['todo:due']],
+    ['อย่าใส่แท็ก แล้วใส่วันที่', ['todo:due']],
+    ['do not make it green, add due dates', ['todo:due']],
+    ["don't add due dates or tags, make it green", ['style:accent', 'todo:accent']],
+    ['อย่าใส่วันที่หรือแท็ก แต่เปลี่ยนเป็นสีเขียว', ['style:accent', 'todo:accent']],
+    ['do not make it blue but green', ['style:accent', 'todo:accent']],
+    ['due dates for all', ['todo:due']],
+    ['give each a date', ['todo:due']],
+    ['add tags', ['todo:tag']],
+    ['green', ['style:accent', 'todo:accent']],
+    ['สีเขียว', ['style:accent', 'todo:accent']],
+    ['add due dates without tags', ['todo:due']],
+    ['make it green without tags', ['style:accent', 'todo:accent']],
+    ['add due dates and keep the chart', ['todo:due']],
+  ];
+  for (const [text, keys] of cases) {
+    forgetOnRequest('?forget=1');
+    noteRevise(before, after, text);
+    assert.deepEqual(learned().map((l) => l.key).sort(), keys, text);
+    assert.equal(styleProfile().accent, keys.includes('style:accent') ? 'green' : STYLE_DEFAULT.accent, text);
+  }
+});
+
+test('noteRevise never treats chart part removal as whole chart removal', () => {
+  const after = todo([{ type: 'checklist', items: [{ text: 'Run', due: 'Mon', tag: 'sport' }] }], { accent: 'green' });
+  for (const text of ['remove the chart heading', 'เอากราฟออกแค่เส้นขอบ', 'ลบหัวข้อกราฟ', 'remove the chart border']) {
+    assert.deepEqual(noteRevise(todo([{ type: 'chart', bars: [] }]), after, text), [], text);
+    assert.deepEqual(learned(), [], text);
+    assert.deepEqual(styleProfile(), STYLE_DEFAULT, text);
+  }
+});
+
 test('a revise teaches what the user asked to change: blocks added or left out, due dates, colour', () => {
   const before = todo([{ type: 'checklist', items: [{ text: 'Run' }] }, { type: 'text', text: 'hi' }]);
   const after = todo([{ type: 'checklist', items: [{ text: 'Run', due: 'Mon' }] }, { type: 'progress', value: 'auto' }], { accent: 'green' });

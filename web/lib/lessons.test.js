@@ -97,6 +97,21 @@ test('the watch asks once per mistake: tool error, layout check, rejection right
   assert.equal(w.agent('ขอโทษค่ะ มองไม่เห็นหน้าเดิม').kind, 'agent blind');
 });
 
+test('negated criticism is feedback, not a mistake signal, while separate criticism still counts', () => {
+  const w = createLessonWatch({ now: () => 100000 });
+  w.pageShown();
+  for (const text of ['ไม่ผิดแล้ว', 'ไม่แย่เลย', 'not ugly', 'it is not wrong', 'not terrible', 'not awful', 'ไม่ได้แย่เลย']) {
+    assert.equal(isRejection(text), false, text);
+    assert.equal(w.user(text), null, text);
+  }
+  for (const text of ['ไม่ผิดแล้ว แต่ไม่ชอบสี', 'ไม่แย่เลย แต่กราฟผิด', 'not ugly, but the numbers are wrong', 'not wrong, but ugly']) {
+    assert.equal(isRejection(text), true, text);
+    const rejected = createLessonWatch({ now: () => 100000 });
+    rejected.pageShown();
+    assert.equal(rejected.user(text).kind, 'user rejected', text);
+  }
+});
+
 test('note_lesson: a tool in the agent config, stores the line, never answers "error:"', () => {
   const def = TOOL_DEFS.find((t) => t.name === 'note_lesson');
   assert.ok(def);

@@ -140,6 +140,41 @@ test('learning: a revise in one visit reaches the next session as {{learned}}; ?
   expect(await page.evaluate(() => [localStorage.getItem('agentos.learned'), localStorage.getItem('agentos.memory')])).toEqual([null, null]);
 });
 
+for (const request of [
+  "don't add due dates or tags; do not make it green",
+  'อย่าใส่วันที่หรือแท็ก อย่าเปลี่ยนเป็นสีเขียว',
+  'remove the chart heading',
+  'เอากราฟออกแค่เส้นขอบ',
+]) {
+  test(`learning: mistaken changes do not persist for "${request}"`, async ({ page }) => {
+    await stubLive(page);
+    await connect(page);
+    const before = { kind: 'todo', title: 'Tasks', accent: 'blue', proposals: [], blocks: [
+      { type: 'chart', bars: [{ label: 'Done', value: 1 }] },
+      { type: 'checklist', items: [{ text: 'Run' }] },
+    ] };
+    await tool(page, 'render_ui', { spec_json: JSON.stringify(before) });
+    await page.evaluate((text) => window.__conv.opts.onMessage({ source: 'user', message: text }), request);
+    await tool(page, 'revise_ui', { spec_json: JSON.stringify({ ...before, accent: 'green', blocks: [
+      { type: 'checklist', items: [{ text: 'Run', due: 'Mon', tag: 'Health' }] },
+    ] }) });
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('agentos.learned') || '[]'))).toEqual([]);
+    expect(await page.evaluate(() => localStorage.getItem('agentos.style'))).toBeNull();
+  });
+}
+
+test('lessons: negated criticism does not send a mistake signal after rendering a page', async ({ page }) => {
+  await stubLive(page);
+  await connect(page);
+  await tool(page, 'render_ui', { spec_json: JSON.stringify({ kind: 'todo', title: 'Tasks', proposals: [], blocks: [{ type: 'text', text: 'Run' }] }) });
+  await page.evaluate(() => {
+    for (const message of ['ไม่ผิดแล้ว', 'ไม่แย่เลย', 'not ugly']) window.__conv.opts.onMessage({ source: 'user', message });
+  });
+  expect(await page.evaluate(() => window.__conv.context.filter((t) => t.startsWith('[lesson]')))).toEqual([]);
+  await page.evaluate(() => window.__conv.opts.onMessage({ source: 'user', message: 'not ugly, but the numbers are wrong' }));
+  await expect.poll(() => page.evaluate(() => window.__conv.context.filter((t) => t.startsWith('[lesson]')).length)).toBe(1);
+});
+
 test('training: the race form waits for a yes; decline leaves it unsent, scene_action confirm sends it', async ({ page }) => {
   await stubLive(page);
   await connect(page);
