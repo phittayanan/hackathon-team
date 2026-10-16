@@ -2,6 +2,7 @@
 // The rules check runs in code (pay-rules.js), never in the model. Voice can never press Allow.
 import { T } from '../timing.js';
 import { checkRules, paymentTotal } from '../pay-rules.js';
+import { paymentSummary } from '../scene-summary.js';
 
 const baht = (n) => `฿${Number(n).toLocaleString('en-US')}`;
 
@@ -65,6 +66,7 @@ export default function mountPayment(el, data, agent) {
   if (data.announce) agent.say('pay_ask');
 
   return {
+    summary: () => paymentSummary(data),
     onAction(action) {
       // Spoken "yes" / "allow" only points at the button.
       if (action === 'button-only') {

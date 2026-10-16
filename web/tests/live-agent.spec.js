@@ -78,7 +78,8 @@ test('live: session request and SDK download start together', async ({ page }) =
 
 test('live: client tools open and act on scenes; payment can never be approved by the agent', async ({ page }) => {
   await liveHome(page);
-  expect(await tool(page, 'open_scene', { scene: 'payment' })).toBe('opened payment');
+  // The agent gets the card's facts: merchant, total and each rule, so it can answer "ยอดเท่าไหร่".
+  expect(await tool(page, 'open_scene', { scene: 'payment' })).toMatch(/^opened payment: Payment request to FreshMart Online, total ฿849\. Rules: Inside monthly budget passed .*Allow is enabled/);
   await expect(page.locator('body')).toHaveAttribute('data-scene', 'payment');
   expect(await tool(page, 'scene_action', { action: 'confirm' })).toMatch(/^refused/);
   await expect(page.locator('[data-testid=allow]')).toHaveClass(/nudge/);
@@ -86,7 +87,7 @@ test('live: client tools open and act on scenes; payment can never be approved b
   expect(await tool(page, 'scene_action', { action: 'close' })).toBe('closed');
   await expectHome(page);
 
-  expect(await tool(page, 'open_scene', { scene: 'flight' })).toBe('opened flight');
+  expect(await tool(page, 'open_scene', { scene: 'flight' })).toMatch(/^opened flight: TG 102 BKK→CNX is delayed 2 h .*Offer: FD 3433 DMK 08:40 → CNX 09:55/);
   await expect(page.locator('body')).toHaveAttribute('data-scene', 'flight');
   await tool(page, 'scene_action', { action: 'confirm' });
   await expect(page.locator('[data-testid=flight-done]')).toBeVisible();
@@ -96,7 +97,8 @@ test('live: client tools open and act on scenes; payment can never be approved b
 test('live: the agent cannot loosen the payment rules through open_scene data', async ({ page }) => {
   await liveHome(page);
   const evil = { merchant: 'Evil Shop', total: 45000, items: [{ name: 'Gadget', qty: 1, price: 45000 }], rules: { monthlyBudgetLeft: 100000, perPaymentCap: 99999, allowedShops: ['Evil Shop'] } };
-  expect(await tool(page, 'open_scene', { scene: 'payment', data_json: JSON.stringify(evil) })).toBe('opened payment');
+  // The agent hears which rules failed, so it can say why Allow cannot be tapped.
+  expect(await tool(page, 'open_scene', { scene: 'payment', data_json: JSON.stringify(evil) })).toMatch(/^opened payment: Payment request to Evil Shop, total ฿45,000\. Rules: Inside monthly budget FAILED .*Under cap per payment FAILED .*Shop on allowed list FAILED .*Allow is disabled/);
   await expect(page.locator('[data-testid=pay-total]')).toHaveText('฿45,000');
   await expect(page.locator('.pay-rules .bad')).toHaveCount(3);
   await expect(page.locator('[data-testid=allow]')).toBeDisabled();
@@ -143,6 +145,56 @@ test('live: kept pages are told to the agent at session start and when kept, and
   await expect(page.locator('[data-testid=g-badge]')).toHaveText('หน้าที่บันทึกไว้');
   await expect(page.locator('[data-testid=g-title]')).toHaveText('Packing list');
   expect(await tool(page, 'render_ui', { spec_json: '{"saved":"nope"}' })).toMatch(/^error/);
+});
+
+test('live: a new session after the old one ended hears which page is open and what it shows', async ({ page }) => {
+  await liveHome(page);
+  const spec = { kind: 'packing', title: 'Packing list', blocks: [{ type: 'checklist', items: [{ text: 'Passport' }] }] };
+  await tool(page, 'render_ui', { spec_json: JSON.stringify(spec) });
+  await expect(page.locator('[data-testid=g-title]')).toHaveText('Packing list');
+  // The session ends (20 s idle or the agent hangs up); the page stays open.
+  await page.evaluate(() => window.__conv.opts.onDisconnect({ reason: 'agent' }));
+  await expect(page.locator('body')).toHaveAttribute('data-brain', 'asleep');
+  await page.locator('#mic').dispatchEvent('pointerdown');
+  await expect(page.locator('body')).toHaveAttribute('data-brain', 'agent');
+  await page.locator('#mic').dispatchEvent('pointerup');
+  await expect.poll(() => page.evaluate(() => window.__conv.context.join('\n'))).toMatch(/\[screen\] The generated page is open: "Packing list"\. .*Passport/);
+
+  // Same for a prebuilt scene: the payment card's total and rules.
+  await tool(page, 'open_scene', { scene: 'payment' });
+  await expect(page.locator('body')).toHaveAttribute('data-scene', 'payment');
+  await page.evaluate(() => window.__conv.opts.onDisconnect({ reason: 'agent' }));
+  await page.locator('#mic').dispatchEvent('pointerdown');
+  await expect(page.locator('body')).toHaveAttribute('data-brain', 'agent');
+  await page.locator('#mic').dispatchEvent('pointerup');
+  await expect.poll(() => page.evaluate(() => window.__conv.context.join('\n'))).toMatch(/\[screen\] The payment page is open: Payment request to FreshMart Online, total ฿849\. Rules:/);
+});
+
+test('live: catalog results, the search error and the choose tap reach the agent', async ({ page }) => {
+  const item = (id, title, seller, amount) => ({ id, title, seller, amount, currency: 'THB', description: 'Wireless', url: `https://merchant.example/${id}`, image: null });
+  let calls = 0;
+  await page.route('**/api/catalog', (r) => r.fulfill({ json: ++calls === 1
+    ? { products: [item('a', 'Buds A', 'Shop One', 129000), item('b', 'Buds B', 'Shop Two', 99000)] }
+    : { error: 'Shopify rate limited' } }));
+  await liveHome(page);
+  expect(await tool(page, 'open_scene', { scene: 'shopping', data_json: JSON.stringify({ catalog: true, query: 'หูฟัง', budget: 1500 }) }))
+    .toBe('opened shopping: Shopify product search for "หูฟัง", budget ฿1500: searching.');
+  await expect(page.locator('.catalog-product')).toHaveCount(2);
+  // Results arrive as silent context, so "อันไหนถูกสุด" has an answer.
+  await expect.poll(() => page.evaluate(() => window.__conv.context.find((t) => t.startsWith('[screen] Catalog results')) || ''))
+    .toBe('[screen] Catalog results: Shopify product search for "หูฟัง", budget ฿1500: 2 results: 1. Buds A (Shop One) ฿1,290.00; 2. Buds B (Shop Two) ฿990.00. Choosing is not buying.');
+  expect(await page.evaluate(() => window.__conv.sent.some((t) => t.includes('Catalog results')))).toBe(false);
+
+  // The choose tap is an event the agent hears.
+  await page.getByRole('button', { name: 'เลือกรายการนี้' }).nth(1).click();
+  await expect.poll(() => page.evaluate(() => window.__conv.sent.find((t) => t.startsWith('[scene event]')) || ''))
+    .toBe('[scene event] The user chose "Buds B" from Shop Two at ฿990.00 on the catalog page. Choosing is not buying; nothing was ordered.');
+
+  // A failed search is told too.
+  await page.getByRole('button', { name: 'ค้นสินค้า', exact: true }).click();
+  await expect(page.locator('.scene-shopping [role=status]')).toContainText('Shopify rate limited');
+  await expect.poll(() => page.evaluate(() => window.__conv.context.find((t) => t.startsWith('[screen] Catalog search failed')) || ''))
+    .toBe('[screen] Catalog search failed: Shopify product search for "หูฟัง", budget ฿1500: the search failed: Shopify rate limited.');
 });
 
 test('live: typed text goes to the agent, and feed changes arrive as contextual updates', async ({ page }) => {

@@ -26,6 +26,11 @@ test('spoken requirements show Shopify product cards and selection never orders 
   await expect(page.getByRole('link', { name: 'ดูสินค้าที่ร้าน' })).toHaveAttribute('href', product.url);
   expect(calls).toBe(1);
   await expect(page.getByTestId('checkout')).toHaveCount(0);
+  // The next request carries the page's results and the chosen one (state()), not just {catalog:true}.
+  const next = page.waitForRequest('**/api/route');
+  await say(page, 'อันไหนถูกสุด');
+  expect((await next).postDataJSON()).toMatchObject({ context: 'shopping', catalog: true, query: 'หาหูฟัง งบ 1500',
+    results: [{ title: '<script>alert(1)</script>', seller: 'Real merchant', price: '฿999.00' }], error: null, chosen: '<script>alert(1)</script> (Real merchant) ฿999.00' });
 });
 
 test('Shopify empty results and errors are visible and retryable on a small phone', async ({ page }) => {
