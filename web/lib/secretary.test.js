@@ -7,6 +7,29 @@ import { keywordRoute } from './router.js';
 
 const settle = () => new Promise(setImmediate);
 
+test('secretary facts expose the email and keep a proposed meeting separate until the owner sends', () => {
+  const s = createSecretary();
+  const initial = s.get();
+  assert.equal(initial.email.subject, 'เตรียมประชุมวันนี้');
+  assert.match(initial.email.body, /นัดเดิม 14:00–14:30/);
+  assert.doesNotMatch(initial.email.body, /ขอเลื่อน/);
+  assert.deepEqual(initial.notices, []);
+  assert.equal(initial.proposedMeeting, null);
+  s.draftReply();
+  assert.deepEqual(s.get().proposedMeeting, { eventId: 'client', start: '14:30', end: '15:00' });
+  assert.equal(s.get().events.find((e) => e.id === 'client').start, '14:00');
+  assert.equal(s.get().sent, false);
+  const copy = s.get(); copy.email.body = 'changed'; copy.proposedMeeting.start = '09:00';
+  assert.equal(s.get().email.body, initial.email.body);
+  assert.equal(s.sendDraft('ตกลงเป็น 14:30 ค่ะ'), true);
+  assert.equal(s.get().events.find((e) => e.id === 'client').start, '14:30');
+  assert.equal(s.get().proposedMeeting, null);
+  s.reset();
+  assert.equal(s.get().events.find((e) => e.id === 'client').start, '14:00');
+  assert.equal(s.get().proposedMeeting, null);
+  s.stop();
+});
+
 test('calendar checks overlap, adjacency and invalid intervals', () => {
   const events = createSecretary().get().events;
   assert.deepEqual(conflicts(events, '13:30', '14:00', 'client').map((e) => e.id), ['team']);

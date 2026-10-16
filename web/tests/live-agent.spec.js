@@ -76,6 +76,19 @@ test('live: session request and SDK download start together', async ({ page }) =
   await page.locator('#mic').dispatchEvent('pointerup');
 });
 
+test('live: secretary tool returns the displayed email and distinguishes a proposal from the current appointment', async ({ page }) => {
+  await liveHome(page);
+  const email = JSON.parse(await tool(page, 'secretary_action', { action: 'email' }));
+  await expect(page.locator('.scene-secretary')).toContainText(email.email.subject);
+  await expect(page.locator('.scene-secretary')).toContainText(email.email.body);
+  expect(email.notices).toEqual([]);
+  expect(email.proposedMeeting).toBeNull();
+  const draft = JSON.parse(await tool(page, 'secretary_action', { action: 'draft' }));
+  expect(draft.proposedMeeting).toEqual({ eventId: 'client', start: '14:30', end: '15:00' });
+  expect(draft.events.find((e) => e.id === 'client').start).toBe('14:00');
+  expect(draft.sent).toBe(false);
+});
+
 test('live: client tools open and act on scenes; payment can never be approved by the agent', async ({ page }) => {
   await liveHome(page);
   expect(await tool(page, 'open_scene', { scene: 'payment' })).toBe('opened payment');

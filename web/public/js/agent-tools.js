@@ -34,7 +34,7 @@ const DESIGN_PARAM = {
 export const TOOL_DEFS = [
   {
     name: 'secretary_action',
-    description: 'Personal secretary DEMO with sample data only. today = today tasks and calendar; email = sample client email; add_tasks = import its two tasks once; draft = prepare editable reply proposing 14:30 (13:30 conflicts with team meeting); acknowledge or snooze = act on displayed notifications. Returns current sample data. No real mail or calendar changes. Sending requires the owner tapping the test-send button; no tool can send.',
+    description: 'Personal secretary DEMO with sample data only. today = today tasks and calendar; email = sample client email; add_tasks = import its two tasks once; draft = prepare editable reply proposing 14:30 (13:30 conflicts with team meeting); acknowledge or snooze = act on displayed notifications. Returns email subject/body, current calendar in events, and proposedMeeting separately from the current appointment. No real mail or calendar changes. Sending requires the owner tapping the test-send button; no tool can send.',
     params: {
       action: { type: 'string', enum: SECRETARY_ACTIONS, description: 'Secretary action', required: true },
       minutes: { type: 'string', enum: ['1', '5'], description: 'Snooze for one or five minutes', required: false },

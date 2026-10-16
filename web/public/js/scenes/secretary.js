@@ -58,7 +58,7 @@ export default function mountSecretary(el, data, agent) {
     }
     if (view === 'email') {
       const mail = h('article', 'secretary-card');
-      mail.append(h('p', 'eyebrow', 'อีเมลตัวอย่าง · จากลูกค้า'), h('h2', null, 'เตรียมประชุมวันนี้'), h('p', null, 'นัดเดิม 14:00–14:30 รบกวนส่งสไลด์และเตรียมหัวข้อประชุมภายใน 13:30 ด้วยค่ะ'));
+      mail.append(h('p', 'eyebrow', 'อีเมลตัวอย่าง · จากลูกค้า'), h('h2', null, state.email.subject), h('p', null, state.email.body));
       el.append(mail);
       el.append(button(state.imported ? 'เพิ่มงานแล้ว ✓' : 'เพิ่ม 2 งานจากอีเมล', () => store.importEmail(), 'import-email'));
       el.append(h('p', 'secretary-note', 'นัด 14:00 มีในตารางตัวอย่างแล้ว จึงไม่สร้างนัดซ้ำ'));
