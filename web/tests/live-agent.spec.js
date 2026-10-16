@@ -78,7 +78,8 @@ test('live: session request and SDK download start together', async ({ page }) =
 
 test('live: client tools open and act on scenes; payment can never be approved by the agent', async ({ page }) => {
   await liveHome(page);
-  expect(await tool(page, 'open_scene', { scene: 'payment' })).toBe('opened payment');
+  // The agent gets the card's facts: merchant, total and each rule, so it can answer "ยอดเท่าไหร่".
+  expect(await tool(page, 'open_scene', { scene: 'payment' })).toMatch(/^opened payment: Payment request to FreshMart Online, total ฿849\. Rules: Inside monthly budget passed .*Allow is enabled/);
   await expect(page.locator('body')).toHaveAttribute('data-scene', 'payment');
   expect(await tool(page, 'scene_action', { action: 'confirm' })).toMatch(/^refused/);
   await expect(page.locator('[data-testid=allow]')).toHaveClass(/nudge/);
@@ -86,7 +87,7 @@ test('live: client tools open and act on scenes; payment can never be approved b
   expect(await tool(page, 'scene_action', { action: 'close' })).toBe('closed');
   await expectHome(page);
 
-  expect(await tool(page, 'open_scene', { scene: 'flight' })).toBe('opened flight');
+  expect(await tool(page, 'open_scene', { scene: 'flight' })).toMatch(/^opened flight: TG 102 BKK→CNX is delayed 2 h .*Offer: FD 3433 DMK 08:40 → CNX 09:55/);
   await expect(page.locator('body')).toHaveAttribute('data-scene', 'flight');
   await tool(page, 'scene_action', { action: 'confirm' });
   await expect(page.locator('[data-testid=flight-done]')).toBeVisible();
@@ -96,7 +97,8 @@ test('live: client tools open and act on scenes; payment can never be approved b
 test('live: the agent cannot loosen the payment rules through open_scene data', async ({ page }) => {
   await liveHome(page);
   const evil = { merchant: 'Evil Shop', total: 45000, items: [{ name: 'Gadget', qty: 1, price: 45000 }], rules: { monthlyBudgetLeft: 100000, perPaymentCap: 99999, allowedShops: ['Evil Shop'] } };
-  expect(await tool(page, 'open_scene', { scene: 'payment', data_json: JSON.stringify(evil) })).toBe('opened payment');
+  // The agent hears which rules failed, so it can say why Allow cannot be tapped.
+  expect(await tool(page, 'open_scene', { scene: 'payment', data_json: JSON.stringify(evil) })).toMatch(/^opened payment: Payment request to Evil Shop, total ฿45,000\. Rules: Inside monthly budget FAILED .*Under cap per payment FAILED .*Shop on allowed list FAILED .*Allow is disabled/);
   await expect(page.locator('[data-testid=pay-total]')).toHaveText('฿45,000');
   await expect(page.locator('.pay-rules .bad')).toHaveCount(3);
   await expect(page.locator('[data-testid=allow]')).toBeDisabled();
