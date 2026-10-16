@@ -91,6 +91,13 @@ export const TOOL_DEFS = [
     params: { spec_json: { type: 'string', description: 'The full changed UI spec as a JSON string', required: true }, design: DESIGN_PARAM },
   },
   {
+    name: 'inspect_page',
+    description:
+      'Look at the generated page as it is painted now: layout, colours, sizes and a layout check. ' +
+      'Call it when the user asks how the page looks or whether anything is wrong.',
+    params: {},
+  },
+  {
     name: 'mark_urgent',
     description:
       'Mark the open generated page as urgent (health, injury or emergency): no like question, no proposed changes, never kept. ' +
@@ -306,6 +313,13 @@ function createScreenHandlers(ui, learn) {
       learn.noteRevise(before, spec);
       offered = null;
       return withSummary('page redrawn', spec);
+    },
+
+    // Measured on the screen now (scenes/generated.js inspect); no picture is sent anywhere.
+    inspect_page() {
+      const open = generated();
+      if (!open?.ctl.inspect) return 'error: no generated page is open';
+      return open.ctl.inspect();
     },
 
     mark_urgent({ level } = {}) {

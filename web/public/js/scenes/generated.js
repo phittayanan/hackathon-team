@@ -8,6 +8,8 @@
 // No answer, an error, a timeout or a page that fails the checks: the block page stays. Once the finished
 // page has painted (and when a kept page reopens), its boxes are measured and checked (page-check.js):
 // any failure brings the block page back, logs one [page check] line and tells the live agent silently.
+// A page that passes is described (page-look.js) in a silent note, so the agent knows how it looks;
+// inspect() measures it again on demand (the inspect_page tool).
 // The agent asks if the user likes it; spoken answers revise the spec and it redraws in place.
 // A page the user likes can be kept as a saved scene in localStorage (with its HTML, if it had one).
 import { T } from '../timing.js';
@@ -16,6 +18,7 @@ import { sanitizePage, sanitizePartial, pageOk } from '../page-sanitize.js';
 import { applyStyle, styleText } from '../style.js';
 import { changeNote, markDone } from '../genui.js';
 import { checkPage, failureText } from '../page-check.js';
+import { describePage } from '../page-look.js';
 import { logEvent } from '../log.js';
 
 // The browser waits a little longer than the server's own 12 s limit (lib/page-model.js).
@@ -271,9 +274,16 @@ function measurePage(host) {
       display: css.display,
       visibility: css.visibility,
       tap: node.matches(TAP),
+      // For page-look.js: colours (a gradient counts by its first colour) and a name hint.
+      color: css.color,
+      background: `${css.backgroundColor} ${css.backgroundImage}`,
+      hint: `${node.getAttribute('role') || ''} ${node.getAttribute('class') || ''}`.trim().slice(0, 80),
     });
   }
-  return { boxes, viewport: { width: host.clientWidth, height: window.innerHeight, contentWidth: body.scrollWidth } };
+  const own = getComputedStyle(body);
+  const frameCss = getComputedStyle(host);
+  const background = `${own.backgroundColor} ${own.backgroundImage} ${frameCss.backgroundColor}`;
+  return { boxes, viewport: { width: host.clientWidth, height: window.innerHeight, contentWidth: body.scrollWidth, background } };
 }
 
 export default function mountGenerated(el, data, agent) {
@@ -304,6 +314,7 @@ export default function mountGenerated(el, data, agent) {
   let view = shown ? 'html' : 'blocks';
   let host = null;
   let pending = null;
+  let lastFailure = ''; // the last layout check failure, for inspect() while the block page shows
 
   // The user changed the page by hand: tell the live agent (app.js sends nothing offline).
   const tell = (change) => agent.tell?.(changeNote(change, spec));
@@ -319,15 +330,29 @@ export default function mountGenerated(el, data, agent) {
     if (!tapped) tell(change);
   };
 
-  // The finished model page on screen passes the layout checks. On a failure: one [page check] log
-  // line and a silent note to the live agent; the caller goes back to the block page. No retry.
-  const pageFits = () => {
-    if (view !== 'html' || !host?.isConnected) return true;
-    const measured = measurePage(host);
-    if (!measured) return true;
+  // The model page on screen, measured now: its check failures and how it looks.
+  const look = () => {
+    const measured = host?.isConnected && measurePage(host);
+    if (!measured) return null;
     const fails = checkPage(measured.boxes, measured.viewport, spec);
-    if (!fails.length) return true;
+    return { fails, text: describePage(measured.boxes, measured.viewport, fails) };
+  };
+
+  // The finished model page on screen passes the layout checks: a silent note says how it looks.
+  // On a failure: one [page check] log line and a silent note to the live agent; the caller goes
+  // back to the block page. No retry.
+  const pageFits = () => {
+    if (view !== 'html') return true;
+    const seen = look();
+    if (!seen) return true;
+    const { fails } = seen;
+    if (!fails.length) {
+      lastFailure = '';
+      agent.tell?.(`[screen] The designed page looks like: ${seen.text}`);
+      return true;
+    }
     const why = failureText(fails);
+    lastFailure = why;
     logEvent('page_check', { text: `[page check] block page kept: ${why}`, kind: spec.kind, failures: fails });
     agent.tell?.(`[screen] The designed page was replaced by the simple page because: ${why}`);
     return false;
@@ -464,6 +489,17 @@ export default function mountGenerated(el, data, agent) {
 
   return {
     state: () => ({ spec, stage: stage === 'saved' ? 'review' : stage }),
+    // How the page looks now, for the inspect_page tool. Measurement only.
+    inspect() {
+      if (view === 'blocks') {
+        return lastFailure
+          ? `the simple block page is showing: the designed page was replaced because its layout check failed: ${lastFailure}`
+          : `the simple block page is showing (${pending ? 'the designed page is still being written' : 'no designed page for this one'}); it draws the spec with the app's own layout`;
+      }
+      const seen = look();
+      if (!seen) return 'error: the page could not be measured';
+      return view === 'partial' ? `the designed page is still being written; so far: ${seen.text}` : seen.text;
+    },
     destroy() {
       pending?.abort();
       pending = null;
