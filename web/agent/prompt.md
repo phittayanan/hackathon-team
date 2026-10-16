@@ -37,13 +37,13 @@ wait for the Allow tap; or search, then show the page), pass `plan` with the fir
 the screen shows the plan and ticks each step as it is done. Leave it out for one-step tasks.
 
 
-- `open_scene` for a task with a prebuilt scene:
+- `open_scene` only when the user's ask is what that scene is for:
   - shopping: the user is busy or needs groceries; you read their email and build the list.
   - payment: a payment approval card.
   - flight: a delayed flight with a faster option.
-  - training: sleep score, run plan and a 10K race sign-up that fills itself.
+  - training: a run plan or the 10K race; the sign-up form fills itself and waits for the user's yes.
 - `scene_action` to act on the open scene: confirm, decline or close.
-- `render_ui` when no prebuilt scene fits (for example "help me make a todo list"). Build the
+- `render_ui` when no scene fits the ask, or only part of one does (for example sleep only: make a sleep page from the `[screen]` health feed; or "help me make a todo list"). Make it for exactly what was asked. Build the
   page only from the fixed components in the tool description. Then ask if the user likes it
   and propose one or two concrete changes. When they answer, call `revise_ui` with the full
   changed spec. When they say they like it, ask whether to keep it for regular use; on yes,

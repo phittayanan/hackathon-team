@@ -1,6 +1,7 @@
 // Proactive training page: sleep score, run plan and a 10K race card.
-// The race card turns into a sign-up form that fills itself and submits,
-// all inside our own UI (no outside website). Ends with the mascot on a treadmill and confetti.
+// The race card turns into a sign-up form that fills itself, then waits for a yes: the user taps
+// Submit or the agent calls scene_action confirm. Decline or close leaves it unsent.
+// All inside our own UI (no outside website). A real submit ends with the mascot on a treadmill and confetti.
 import { trainingSummary } from '../scene-summary.js';
 
 export default function mountTraining(el, data, agent) {
@@ -27,7 +28,7 @@ export default function mountTraining(el, data, agent) {
         <form class="race-form" data-testid="race-form" hidden>
           ${fields.map(([id, label]) => `<label>${label}<input data-field="${id}" readonly></label>`).join('')}
           <label class="agree"><input type="checkbox" data-field="agree" disabled> I agree to the race rules</label>
-          <button type="button" class="btn btn-allow" data-testid="race-submit">Submit</button>
+          <button type="button" class="btn btn-allow" data-testid="race-submit" disabled>Submit</button>
         </form>
       </div>
     </article>
@@ -49,10 +50,36 @@ export default function mountTraining(el, data, agent) {
     el.appendChild(box);
   };
 
+  const raceEl = el.querySelector('.race');
+  const submit = el.querySelector('[data-testid=race-submit]');
+  // filled: the form is ready to send; asked: a confirm came while it was still filling.
+  let filled = false;
+  let asked = false;
+  let done = false;
+
+  const send = async () => {
+    if (done || !agent.alive()) return;
+    if (!filled) { asked = true; return; }
+    done = true;
+    submit.disabled = true;
+    submit.classList.add('pressed');
+    submit.textContent = 'Submitting…';
+    await agent.wait(900);
+    if (!agent.alive()) return;
+    raceEl.hidden = true;
+    el.querySelector('.race-done').hidden = false;
+    el.classList.add('signed-up');
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    confetti();
+    await agent.say('train_done');
+    await agent.wait(1500);
+    agent.close();
+  };
+  submit.addEventListener('click', send);
+
   (async () => {
     await agent.wait(2600);
     if (!agent.alive()) return;
-    const raceEl = el.querySelector('.race');
     raceEl.classList.add('expanding');
     raceEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     el.querySelector('.race-form').hidden = false;
@@ -68,21 +95,17 @@ export default function mountTraining(el, data, agent) {
       await agent.wait(150);
     }
     el.querySelector('[data-field=agree]').checked = true;
-    await agent.wait(400);
-    const submit = el.querySelector('[data-testid=race-submit]');
-    submit.classList.add('pressed');
-    submit.textContent = 'Submitting…';
-    await agent.wait(900);
-    if (!agent.alive()) return;
-    raceEl.hidden = true;
-    el.querySelector('.race-done').hidden = false;
-    el.classList.add('signed-up');
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-    confetti();
-    await agent.say('train_done');
-    await agent.wait(1500);
-    agent.close();
+    if (!agent.alive() || done) return;
+    filled = true;
+    submit.disabled = false;
+    if (asked) send();
   })();
 
-  return { summary: () => trainingSummary(data) };
+  return {
+    summary: () => trainingSummary(data),
+    onAction(action) {
+      if (action === 'confirm') send();
+      if (action === 'decline') asked = false; // stays unsent until the user taps Submit
+    },
+  };
 }

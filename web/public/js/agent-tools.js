@@ -56,7 +56,9 @@ export const TOOL_DEFS = [
     name: 'open_scene',
     description:
       'Open a prebuilt full-screen scene. shopping = read the weekly shopping email and build the list; payment = payment approval card; ' +
-      'flight = delayed flight with a faster option; training = sleep score, run plan and 10K race sign-up that fills itself. ' +
+      'flight = delayed flight with a faster option; training = sleep score, run plan and 10K race sign-up (fills itself, waits for the user\'s yes). ' +
+      'Open one only when the ask is what it is for (training: a run plan or the race; shopping: groceries or email to-dos; payment: a payment; flight: the delayed flight). ' +
+      'If none fits, or only part of one (for example sleep only), call render_ui instead and make a page for exactly what was asked. ' +
       'For product discovery across Shopify merchants, use shopping with data_json {"catalog":true,"query":"product requirements","budget":1500}. Budget is optional THB. The page searches Shopify Global Catalog and shows real product cards for owner selection. ' +
       'This does not place orders or pay.',
     params: {
@@ -75,7 +77,7 @@ export const TOOL_DEFS = [
   {
     name: 'render_ui',
     description:
-      'When no prebuilt scene fits, draw a new full-screen page from the fixed components. spec_json is a JSON object: ' +
+      'When no prebuilt scene fits, or only part of one, draw a new full-screen page from the fixed components. spec_json is a JSON object: ' +
       '{kind, name, match:[words], title, subtitle, accent: orange|green|blue|purple|pink|dark, urgency: none|urgent|serious, ' +
       'blocks:[...], proposals:[{id,label}]}. Block types: text{text} stat{label,value} progress{label,value 0-100 or "auto"} ' +
       'checklist{items:[{text,done,due,tag}]} list{items} card{title,text} chart{bars:[{label,value}]} field{label,placeholder} ' +

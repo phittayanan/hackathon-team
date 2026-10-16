@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SCENE_DEFAULTS } from '../public/js/data.js';
-import { paymentSummary, flightSummary, shoppingSummary, trainingSummary, catalogSummary, clip, openPageNote, SCENE_SUMMARY_MAX } from '../public/js/scene-summary.js';
+import { paymentSummary, flightSummary, shoppingSummary, trainingSummary, catalogSummary, clip, openPageNote, healthNote, SCENE_SUMMARY_MAX } from '../public/js/scene-summary.js';
 
 test('payment summary: merchant, total, every rule passed and Allow enabled', () => {
   const s = paymentSummary(SCENE_DEFAULTS.payment);
@@ -39,7 +39,15 @@ test('shopping and training summaries carry their key facts', () => {
   const train = trainingSummary(SCENE_DEFAULTS.training);
   assert.match(train, /^Sleep score 86, 7 h 40 m asleep, resting 54 bpm\. This week: Today Easy 5 km at 6:30 \/km,/);
   assert.match(train, /Race: Bangkok City 10K, 15 Nov 2026, Lumphini Park, Free team slot/);
+  assert.match(train, /waits for the user's yes/);
   for (const s of [shop, train]) assert.ok(s.length <= SCENE_SUMMARY_MAX);
+});
+
+test('health note: sleep score, hours asleep, resting heart rate and the run plan, whole', () => {
+  const n = healthNote(SCENE_DEFAULTS.training);
+  assert.match(n, /^\[screen\] The user's health feed .*sleep score 86, 7 h 40 m asleep, resting heart rate 54 bpm\./);
+  assert.match(n, /Run plan this week: Today Easy 5 km at 6:30 \/km, Thu Intervals 6 × 400 m at 5:10 \/km, Sat Long 9 km at 6:45 \/km\./);
+  assert.ok(!n.endsWith('…'));
 });
 
 test('catalog summary: searching, results with sellers and prices, chosen, error, empty', () => {

@@ -20,6 +20,8 @@ test('sleep data opens training by itself', async ({ page }) => {
   await home(page, { presenter: true });
   await fire(page, 'sleep-synced');
   await expect(page.locator('body')).toHaveAttribute('data-scene', 'training', { timeout: 5000 });
+  // The race sign-up waits for the user's tap before it sends and folds home.
+  await page.click('[data-testid=race-submit]');
   await expectHome(page);
 });
 

@@ -61,7 +61,7 @@ export function trainingSummary(data = {}) {
   const week = plan.map((p) => `${p.day} ${p.run} at ${p.pace}`).join(', ');
   return clip(
     `Sleep score ${data.sleepScore}, ${data.sleepHours} asleep, resting ${data.restingHr} bpm. ` +
-    `This week: ${week}. Race: ${race.name}, ${race.date}, ${race.place}, ${race.entry}; the sign-up form fills and submits itself.`,
+    `This week: ${week}. Race: ${race.name}, ${race.date}, ${race.place}, ${race.entry}; the sign-up form fills itself but is not sent: it waits for the user's yes (they tap Submit, or say yes and you call scene_action confirm).`,
   );
 }
 
@@ -74,6 +74,16 @@ export function catalogSummary(facts = {}) {
   if (!facts.results.length) return clip(`${head}: no products found that ship to Thailand.`);
   const list = facts.results.map((r, n) => `${n + 1}. ${r.title} (${r.seller}) ${r.price}`).join('; ');
   return clip(`${head}: ${facts.results.length} results: ${list}.${facts.chosen ? ` Chosen: ${facts.chosen}.` : ''} Choosing is not buying.`);
+}
+
+// The [screen] note with the user's health facts, sent once when a live session starts, so the agent
+// can make a page for exactly what was asked (for example sleep only) without opening training.
+export function healthNote(data = {}) {
+  const week = (data.plan || []).map((p) => `${p.day} ${p.run} at ${p.pace}`).join(', ');
+  return clip(
+    `[screen] The user's health feed (no page shows it now): sleep score ${data.sleepScore}, ${data.sleepHours} asleep, ` +
+    `resting heart rate ${data.restingHr} bpm. Run plan this week: ${week}. Use it for a page or an answer; do not read this note aloud.`,
+  );
 }
 
 // The [screen] note for a page that is open when a new live session starts; '' on the home.
