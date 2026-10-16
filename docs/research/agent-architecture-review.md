@@ -1,6 +1,22 @@
 # Q-Bot agent architecture review
 
-<!-- SUMMARY: written last, in part 3 -->
+**Result.** Sound design: one voice agent, 9 small tools, a page writer, an offline fallback. Weak spots: a blocked key is never skipped, one error message covers two faults, and nothing tests the agent's choices.
+
+**Meaning.** If a workspace is blocked again, judges silently get the weaker offline agent, even with good keys left.
+
+**Before 14:00 (each under 1 hour, low risk):**
+
+1. Remove the blocked key from `ELEVENLABS_API_KEYS` on Vercel; redeploy (R1).
+2. Treat "restricted" like "out of credit", so the next key is used (R2).
+3. Split the `render_ui` error into bad JSON and bad blocks (T1, via the `agent-tools.js` session).
+
+**After the hackathon:**
+
+1. 15 scripted turns as ElevenLabs agent tests (E1).
+2. Pass the spec as an object, not a JSON string (T2).
+3. Shorter prompt in sections, conflicts fixed (P1–P3).
+4. One paid workspace for the stage agent (R6).
+5. Lower page-writer temperature; learn from page-check failures (G1–G2).
 
 Date: 2026-10-16. Read from `main` at `31c0cfd` (after pull requests #43, #45, #46, #47, #48).
 Code was read only: no test run, no ElevenLabs call, no key used.
