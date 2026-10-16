@@ -1,7 +1,7 @@
 // Client tools of the ElevenLabs agent: the only way the live agent can change the UI.
 // Each tool gets plain parameters from the agent and returns a short text result to it.
 // The money rule lives here too: no tool can approve a payment. Only the owner's tap on Allow can.
-import { validateSpec, pageSummary } from './genui.js';
+import { validateSpec, pageSummary, specError } from './genui.js';
 import { plan as screenPlan } from './plan.js';
 import { remember as keepFact, forgetMemory, MEMORY_KEYS } from './memory.js';
 import * as learner from './learn.js';
@@ -286,7 +286,7 @@ function createScreenHandlers(ui, learn) {
         return withSummary(`reopened the kept page "${kept.name || kept.kind}"; say it is ready, do not ask if they like it`, shown);
       }
       let spec = validateSpec(parsed);
-      if (!spec) return NO_BLOCKS;
+      if (!spec) return specError(spec_json);
       passedOver();
       await ui.openScene('generated', { spec, ...(spec.urgency === 'none' ? designOf(design) : {}) });
       if (spec.urgency === 'none') offered = { spec };
@@ -297,7 +297,7 @@ function createScreenHandlers(ui, learn) {
       const open = generated();
       if (!open) return 'error: no generated page is open';
       let spec = validateSpec(parseJson(spec_json));
-      if (!spec) return NO_BLOCKS;
+      if (!spec) return specError(spec_json);
       // A revise keeps the sources of the page it changes.
       const before = open.ctl.state?.().spec;
       spec = withSources(spec, before?.blocks.find((b) => b.type === 'sources')?.items);
