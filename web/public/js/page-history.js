@@ -7,31 +7,15 @@
 //   v: 1, 2, 3...; brief: the design brief it was drawn from ('' for none); accent: the spec's accent
 //   view: 'pending' (designed page being written), 'html' (designed page shown), 'blocks' (simple page)
 //   look: { background, accent, sections } from page-look.js describeLook, once the designed page painted
-//   palette: the designed page's most used colours, '#rrggbb', most used first
-import { parseColour } from './page-look.js';
+//   palette: the designed page's most used colours as painted, '#rrggbb', most used first (describeLook)
 
 export const MAX_VERSIONS = 5;
 export const MAX_HISTORY_CHARS = 700;
-const MAX_PALETTE = 5;
 
 const clip = (s, n) => {
   const t = String(s ?? '').replace(/\s+/g, ' ').trim();
   return t.length > n ? `${t.slice(0, n - 1)}…` : t;
 };
-const hex = (rgb) => `#${rgb.map((n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0')).join('')}`;
-
-// The most used colours in a page's HTML (style blocks and style attributes), as '#rrggbb'.
-// '&#123;' is a character reference, not a colour; 8-digit hex (with alpha) is skipped.
-export function paletteOf(html) {
-  const counts = new Map();
-  for (const m of String(html || '').matchAll(/(?<!&)#(?:[0-9a-f]{6}|[0-9a-f]{3})(?![0-9a-f])|rgba?\([^)]*\)/gi)) {
-    const rgb = parseColour(m[0]);
-    if (!rgb) continue;
-    const key = hex(rgb);
-    counts.set(key, (counts.get(key) || 0) + 1);
-  }
-  return [...counts].sort((a, b) => b[1] - a[1]).slice(0, MAX_PALETTE).map(([c]) => c);
-}
 
 // Add a version; the newest MAX_VERSIONS are kept.
 export function addVersion(list, { brief = '', accent = '', view = 'blocks' } = {}) {

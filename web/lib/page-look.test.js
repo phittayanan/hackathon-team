@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { checkPage } from '../public/js/page-check.js';
-import { describePage, parseColour, colourName, MAX_LOOK_CHARS } from '../public/js/page-look.js';
+import { describePage, describeLook, parseColour, colourName, MAX_LOOK_CHARS, MAX_PALETTE } from '../public/js/page-look.js';
 
 const VIEW = { width: 390, height: 800, contentWidth: 390, background: 'rgba(0, 0, 0, 0) rgb(255, 255, 255)' };
 const SPEC = { title: 'Beach day', blocks: [{ type: 'checklist', items: [{ text: 'Pack the bag' }, { text: 'Book the hotel room' }] }] };
@@ -80,4 +80,19 @@ test('colours: parsed from rgb, rgba and hex; transparent skipped; named by the 
 test('checkPage ignores the extra colour fields', () => {
   const plain = page().map(({ color, background, hint, ...rest }) => rest);
   assert.deepEqual(checkPage(page(), VIEW, SPEC), checkPage(plain, VIEW, SPEC));
+});
+
+test('describeLook palette: the painted colours as #rrggbb, most used first, background included', () => {
+  // Computed styles: the browser has already turned ivory, hsl() and var() colours into rgb().
+  const boxes = [
+    box(-1, 'h1', 'Bangkok runs', [0, 0, 390, 40], { fontSize: 32, color: 'rgb(102, 51, 153)' }),
+    box(-1, 'section', '', [0, 60, 390, 300], { background: 'rgb(255, 215, 0) none' }),
+    box(-1, 'p', 'Hidden', [0, 400, 390, 24], { display: 'none', color: 'rgb(1, 2, 3)' }),
+    box(-1, 'p', 'No colour here', [0, 400, 390, 24], { color: 'rgba(0, 0, 0, 0)' }),
+  ];
+  const look = describeLook(boxes, { ...VIEW, background: 'rgb(255, 255, 240) none' }, []);
+  assert.deepEqual(look.palette, ['#fffff0', '#ffd700', '#663399']);
+  assert.equal(look.text, describePage(boxes, { ...VIEW, background: 'rgb(255, 255, 240) none' }, []));
+  const many = Array.from({ length: 9 }, (_, i) => box(-1, 'div', '', [0, i * 10, 10, 10], { background: `rgb(${i * 20}, 10, 10) none` }));
+  assert.equal(describeLook(many, VIEW, []).palette.length, MAX_PALETTE);
 });

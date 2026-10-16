@@ -1,15 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addVersion, historyText, lookText, paletteOf, referenceOf, MAX_VERSIONS, MAX_HISTORY_CHARS } from '../public/js/page-history.js';
+import { addVersion, historyText, lookText, referenceOf, MAX_VERSIONS, MAX_HISTORY_CHARS } from '../public/js/page-history.js';
 
 const shown = (list, look, palette) => Object.assign(list.at(-1), { view: 'html', look, palette });
-
-test('paletteOf: the most used colours as #rrggbb; character references and 8-digit hex are not colours', () => {
-  const html = '<style>.a{color:#2b6be0}.b{background:#2B6BE0}.c{border:1px solid rgb(246, 239, 228)}.d{color:#fff}' +
-    '.e{color:rgba(0,0,0,0)}.f{color:#ffffff80}</style><p>&#123; ok</p>';
-  assert.deepEqual(paletteOf(html), ['#2b6be0', '#f6efe4', '#ffffff']);
-  assert.deepEqual(paletteOf(''), []);
-});
 
 test('versions: numbered, the newest five kept, the one on screen named', () => {
   let list = addVersion([], { brief: 'A blue list of races', accent: 'blue', view: 'pending' });

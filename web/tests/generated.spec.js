@@ -416,3 +416,14 @@ test('live: a revise lists the earlier versions; the page writer gets the phone 
   expect(calls[2].reference).toMatchObject({ v: 1, brief: 'Blue beach packing list' });
   expect(calls[2].reference.look).toMatch(/colours #e8f4ff/);
 });
+
+test('live: the palette of a version is the painted colours, so named and hsl() colours reach the page writer', async ({ page }) => {
+  const html = packPage(PACK.blocks[0].items.map((i) => i.text)).replace('background:#e8f4ff;color:#14273a', 'background:ivory;color:hsl(270 50% 40%)');
+  const calls = await stubPage(page, html);
+  await liveHome(page);
+  await tool(page, 'render_ui', { spec_json: JSON.stringify(PACK), design: 'Ivory packing list' });
+  await expect.poll(() => page.evaluate(() => window.__conv.context.join('\n'))).toContain('[screen] The designed page (v1) looks like');
+  await tool(page, 'revise_ui', { spec_json: JSON.stringify(PACK), design: 'Bigger items, same colours' });
+  await expect.poll(() => calls.length).toBe(2);
+  expect(calls[1].base.palette).toEqual(expect.arrayContaining(['#fffff0', '#663399']));
+});

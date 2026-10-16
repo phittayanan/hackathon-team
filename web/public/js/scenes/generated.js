@@ -23,7 +23,7 @@ import { applyStyle, styleText } from '../style.js';
 import { changeNote, markDone } from '../genui.js';
 import { checkPage, failureText } from '../page-check.js';
 import { describeLook } from '../page-look.js';
-import { addVersion, historyText, paletteOf, referenceOf } from '../page-history.js';
+import { addVersion, historyText, referenceOf } from '../page-history.js';
 import { logEvent } from '../log.js';
 
 // The browser waits a little longer than the server's own 12 s limit (lib/page-model.js).
@@ -376,7 +376,7 @@ export default function mountGenerated(el, data, agent) {
       const now = current();
       now.view = 'html';
       now.look = { background: seen.background, accent: seen.accent, sections: seen.sections };
-      now.palette = paletteOf(shown);
+      now.palette = seen.palette;
       agent.tell?.(`[screen] The designed page (v${now.v}) looks like: ${seen.text}`);
       return true;
     }
