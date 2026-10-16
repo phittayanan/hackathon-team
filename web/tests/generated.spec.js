@@ -322,6 +322,29 @@ test('live: ticking an item or a toggle sends a silent [screen] update with the 
   expect(await page.evaluate(() => window.__conv.context.filter((t) => t.startsWith('[screen] The user changed')).length)).toBe(3);
 });
 
+// ---------- Lessons from mistakes (lessons.js) ----------
+
+test('live: a tool error asks the agent for a lesson; note_lesson keeps it on the phone; the next session gets {{lessons}}', async ({ page }) => {
+  await liveHome(page);
+  expect(await page.evaluate(() => window.__conv.opts.dynamicVariables.lessons)).toBe('nothing yet');
+  expect(await tool(page, 'render_ui', { spec_json: '{"kind":"todo",' })).toMatch(/^error: spec_json is not valid JSON/);
+  const context = () => page.evaluate(() => window.__conv.context.join('\n'));
+  await expect.poll(context).toContain('[lesson] A mistake just happened: the render_ui tool answered "error: spec_json is not valid JSON');
+  expect(await context()).toContain('call note_lesson once');
+  // Silent: a contextual update, never a user message.
+  expect(await page.evaluate(() => window.__conv.sent.join('\n'))).not.toContain('[lesson]');
+
+  const rule = 'Write spec_json as one complete JSON object and check every bracket is closed.';
+  expect(await tool(page, 'note_lesson', { lesson: rule })).toBe('noted; do not mention it to the user');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('agentos.lessons')).map((l) => l.text))).toEqual([rule]);
+  const lessonLog = await page.evaluate(() => window.__runlog.filter((e) => e.type === 'lesson').map(({ state, signal, text }) => ({ state, signal, text })));
+  expect(lessonLog).toEqual([{ state: 'asked', signal: 'tool error', text: undefined }, { state: 'noted', signal: undefined, text: rule }]);
+
+  // A new visit on the same phone: the agent starts with the lesson.
+  await liveHome(page);
+  expect(await page.evaluate(() => window.__conv.opts.dynamicVariables.lessons)).toBe(`1) ${rule}`);
+});
+
 // ---------- Layout check on the painted model page (page-check.js) ----------
 
 const PACK = { kind: 'pack', name: 'Pack', title: 'จัดกระเป๋าไปทะเล', accent: 'blue', proposals: [], blocks: [{ type: 'checklist', items: [{ text: 'ครีมกันแดด' }, { text: 'ชุดว่ายน้ำ' }, { text: 'แว่นกันแดด' }] }] };

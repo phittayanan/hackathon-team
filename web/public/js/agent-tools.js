@@ -6,6 +6,7 @@ import { plan as screenPlan } from './plan.js';
 import { remember as keepFact, forgetMemory, MEMORY_KEYS } from './memory.js';
 import * as learner from './learn.js';
 import { resetStyle } from './style.js';
+import { addLesson, forgetLessons, MAX_LESSON_LEN } from './lessons.js';
 import { videoQueryFromRequest } from './youtube-search.js';
 
 export const PROACTIVE_SCENES = ['shopping', 'payment', 'flight', 'training'];
@@ -144,6 +145,16 @@ export const TOOL_DEFS = [
     params: {},
   },
   {
+    name: 'note_lesson',
+    description:
+      'Save one lesson from a mistake on the user\'s phone, so you do better from the next visit on. Call it only when a [lesson] note ' +
+      'asks for it, once, without saying anything, and do not tell the user. The lesson is ONE short rule: what to do next time, not ' +
+      'what to avoid, for example "When asked to make a page prettier, change only its look and keep its content."',
+    params: {
+      lesson: { type: 'string', description: `The rule, one sentence, at most ${MAX_LESSON_LEN} characters, in English`, required: true },
+    },
+  },
+  {
     name: 'remember',
     description:
       'Save one short fact about the user on their phone, so you know it on their next visit. name = what to call them; ' +
@@ -151,7 +162,7 @@ export const TOOL_DEFS = [
       'The last task is saved by itself. Call it without saying anything first, and do not tell the user unless they ask. ' +
       'forget_all when the user asks you to forget them.',
     params: {
-      key: { type: 'string', enum: [...MEMORY_KEYS.filter((k) => k !== 'last_task'), 'forget_all'], description: 'Which fact; forget_all = the user asked you to forget everything (facts and what you learned)', required: true },
+      key: { type: 'string', enum: [...MEMORY_KEYS.filter((k) => k !== 'last_task'), 'forget_all'], description: 'Which fact; forget_all = the user asked you to forget everything (facts, what you learned and your lessons)', required: true },
       value: { type: 'string', description: 'The fact, a few words (empty to forget it)', required: true },
     },
   },
@@ -232,10 +243,15 @@ export function createToolHandlers(ui) {
   const handlers = createScreenHandlers(ui, learn);
   handlers.remember = ({ key, value } = {}) => {
     if (key === 'forget_all') {
-      (ui.forget || (() => { forgetMemory(); learn.forgetLearned(); resetStyle(); }))();
+      (ui.forget || (() => { forgetMemory(); learn.forgetLearned(); resetStyle(); forgetLessons(); }))();
       return 'forgot everything about the user on this phone; say so in one short sentence';
     }
     return remember(key, value) ? `remembered ${key}; do not mention it` : `error: key must be one of ${MEMORY_KEYS.join(', ')}`;
+  };
+  // Not "error:": a failed note must not ask for a lesson about itself.
+  handlers.note_lesson = ({ lesson } = {}) => {
+    const kept = (ui.addLesson || addLesson)(lesson);
+    return kept ? 'noted; do not mention it to the user' : 'not saved: the lesson must be one short sentence';
   };
   // Every tool: start the plan line if one came with it; a step tool that worked ticks it and
   // saves the last task. A sync result stays sync (the payment refusal is immediate).

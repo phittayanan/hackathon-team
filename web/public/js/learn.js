@@ -4,6 +4,7 @@
 // The live agent gets them as {{learned}} at session start and builds the next page with them.
 // Capped (newest 6), each line short; `?forget=1` or the remember tool's forget_all resets.
 import { styleProfile, setStyle, resetStyle, STYLE_FIELDS, STYLE_WORDS } from './style.js';
+import { forgetLessons } from './lessons.js';
 
 const KEY = 'agentos.learned';
 export const MAX_LEARNED = 6;
@@ -71,19 +72,85 @@ const items = (spec) => (spec?.blocks || []).filter((b) => b.type === 'checklist
 // Every checklist item has the field (a revise "give each task a due date" makes it so).
 const uses = (spec, field) => items(spec).length > 0 && items(spec).every((i) => i[field]);
 
-// What a revise changed, as short preferences: [{ key, text }].
-export function reviseLessons(before, after) {
+// Words that name each change, Thai and English, so a revise saves only what the user asked for.
+// Thai words that sit inside common words are guarded ("รูปแบบ" is "format", not "a picture").
+const BLOCK_WORDS = {
+  text: /\bnotes?\b|\btext\b|ข้อความ|โน้ต/i,
+  stat: /numbers?|\bstats?\b|statistic|ตัวเลข|สถิติ/i,
+  progress: /progress|ความคืบหน้า|หลอด|แถบ/i,
+  checklist: /check ?list|checkbox|เช็[คก]ลิสต์|ติ๊ก/i,
+  list: /(?<!check ?)\blists?\b|รายการ/i,
+  card: /\bcards?\b|การ์ด/i,
+  chart: /\bcharts?\b|\bgraphs?\b|กราฟ|แผนภูมิ/i,
+  field: /\bfields?\b|\binput|ช่องกรอก|ช่องใส่/i,
+  button: /button|ปุ่ม/i,
+  steps: /\bsteps?\b|ขั้นตอน/i,
+  image: /image|picture|photo|รูปภาพ|รูป(?!แบบ)/i,
+};
+const DUE_WORDS = /\bdue\b|deadline|\bdates?\b|กำหนดส่ง|ครบกำหนด|เดดไลน์|วันที่/i;
+const TAG_WORDS = /\btags?\b|\blabels?\b|แท็ก|ป้าย/i;
+
+// Keep shared negation over "dates or tags"; a new command starts its own intent.
+function affirmativeWish(wish, words) {
+  if (!words) return false;
+  const negative = /\b(?:not|never|no|don't|don’t|cannot|can't|can’t|remove|drop|delete|omit|leave|without|avoid|unnecessary)\b|อย่า|ห้าม|ไม่|ลบ|ตัด/i;
+  const clauses = wish.split(/[,;.!?\n]|\b(?:but|then)\b|แต่|แล้ว|\band\s+(?=(?:add|include|insert|show|give|make|change|keep|retain)\b)|และ\s*(?=เพิ่ม|ใส่|ขอ|เปลี่ยน)/i)
+    .flatMap((clause) => clause.split(/\s+(?=(?:add|include|insert|show|give|make|change|remove|drop|delete|omit|without|keep|retain)\b|เพิ่ม|ใส่|ขอ|เปลี่ยน|ไม่เอา|เอา|ลบ|ตัด)/i).reduce((parts, part) => {
+      // Modifiers, extra spaces and shared "or" do not end a negative command.
+      if (parts.length && negative.test(parts.at(-1))) parts[parts.length - 1] += ` ${part}`;
+      else parts.push(part);
+      return parts;
+    }, []));
+  const matches = clauses.map((clause) => {
+    const match = words.exec(clause);
+    if (!match) return null;
+    return !negative.test(clause) && !/\b(?:keep|retain)\b|เก็บ|คงไว้/i.test(clause);
+  }).filter((match) => match !== null);
+  return matches.includes(true) && !matches.includes(false);
+}
+
+// shortcut: only direct commands in simple clauses; skip ambiguous wording until richer intent is needed.
+function blockDirection(wish, type) {
+  if (!BLOCKS[type]) return '';
+  const noun = `(?:${BLOCK_WORDS[type].source})`;
+  const object = `(?:(?:a|an|the|some)\\s+)?${noun}(?!['’]s\\b|\\s+(?:colou?r|style|title|heading|size|border|background|shadow|legend|labels?|axes|axis)\\b)`;
+  const add = new RegExp(`\\b(?:add|include|insert|show)\\s+${object}|(?:เพิ่ม|ใส่)\\s*${noun}|ขอ\\s*${noun}(?:สรุป)?ด้วย`, 'i');
+  const remove = new RegExp(`\\b(?:remove|drop|delete|omit)\\s+${object}|\\btake\\s+${object}\\s+out\\b|(?:ลบ|ตัด|ไม่เอา)\\s*${noun}|เอา\\s*${noun}\\s*ออก`, 'i');
+  // Expand a shared verb only for positive commands: "add due dates and a progress bar".
+  if (!/\b(?:not|never|no|keep|retain|don't|don’t|cannot|can't|can’t)\b|อย่า|ห้าม|เก็บ|ไม่/i.test(wish)) {
+    wish = wish.split(/[,;.!?\n]|\b(?:but|then)\b|\band\s+(?=(?:add|include|insert|show|remove|drop|delete|omit)\b)/i)
+      .map((clause) => clause.replace(/\b(add|include|insert|show|remove|drop|delete|omit)\s+([^,;.!?\n]+?)\s+and\s+(?=(?:a|an|the|some)\s)/gi, '$1 $2, $1 ')).join(',');
+  }
+  const directions = new Set();
+  for (const clause of wish.split(/[,;.!?\n]|\b(?:and|but|then)\b|และ|แต่|แล้ว/i)) {
+    if (!BLOCK_WORDS[type].test(clause)) continue;
+    // Thai can name the part before the component or after "ออกแค่".
+    if (/เส้นขอบ|หัวข้อ|หัวเรื่อง|คำอธิบาย|พื้นหลัง|แกน/.test(clause)) continue;
+    // A negated command or a request to keep this component is not an add/remove preference.
+    if (/\b(?:not|never|no|keep|retain)\b|\b(?:don't|don’t|cannot|can't|can’t)\b|อย่า|ห้าม|เก็บ|คงไว้|ไม่(?!เอา)|ไม่เอา.*ออก/i.test(clause)) return '';
+    if (add.test(clause)) directions.add('+');
+    if (remove.test(clause)) directions.add('-');
+  }
+  return directions.size === 1 ? [...directions][0] : '';
+}
+
+// What a revise changed, as short preferences: [{ key, text }]. Only the changes the user's words
+// (wish) name: the agent's own extras ("make it prettier" -> an orange accent and a progress bar)
+// are not the user's preferences.
+export function reviseLessons(before, after, wish = '') {
   if (!before || !after) return [];
+  const said = String(wish || '');
+  if (!said.trim()) return [];
   const kind = kindOf(after);
   const name = pageName(after);
   const out = [];
   const was = types(before);
   const now = types(after);
-  for (const t of now) if (!was.has(t) && BLOCKS[t]) out.push({ key: `${kind}:+${t}`, text: `${name} pages: add ${BLOCKS[t]}` });
-  for (const t of was) if (!now.has(t) && BLOCKS[t]) out.push({ key: `${kind}:-${t}`, text: `${name} pages: leave out ${BLOCKS[t]}` });
-  if (!uses(before, 'due') && uses(after, 'due')) out.push({ key: `${kind}:due`, text: `${name} pages: give checklist items due dates` });
-  if (!uses(before, 'tag') && uses(after, 'tag')) out.push({ key: `${kind}:tag`, text: `${name} pages: tag checklist items` });
-  if (after.accent && before.accent !== after.accent) out.push({ key: `${kind}:accent`, text: `${name} pages: ${after.accent} colour` });
+  for (const t of now) if (!was.has(t) && blockDirection(said, t) === '+') out.push({ key: `${kind}:+${t}`, text: `${name} pages: add ${BLOCKS[t]}` });
+  for (const t of was) if (!now.has(t) && blockDirection(said, t) === '-') out.push({ key: `${kind}:-${t}`, text: `${name} pages: leave out ${BLOCKS[t]}` });
+  if (!uses(before, 'due') && uses(after, 'due') && affirmativeWish(said, DUE_WORDS)) out.push({ key: `${kind}:due`, text: `${name} pages: give checklist items due dates` });
+  if (!uses(before, 'tag') && uses(after, 'tag') && affirmativeWish(said, TAG_WORDS)) out.push({ key: `${kind}:tag`, text: `${name} pages: tag checklist items` });
+  if (after.accent && before.accent !== after.accent && affirmativeWish(said, SPEC_ACCENT_WORDS[after.accent])) out.push({ key: `${kind}:accent`, text: `${name} pages: ${after.accent} colour` });
   return out;
 }
 
@@ -112,6 +179,17 @@ const ACCENT_WORDS = [
   ['blue', /blue|น้ำเงิน|สีฟ้า/i],
   ['green', /green|เขียว/i],
 ];
+// The page accents (genui.js) and the words that name them: the style accents above where they
+// match, plus orange and dark. "สีส้ม", not a bare "ส้ม" (som tam).
+const accentWords = (style) => ACCENT_WORDS.find(([k]) => k === style)[1];
+const SPEC_ACCENT_WORDS = {
+  orange: /orange|สีส้ม/i,
+  green: accentWords('green'),
+  blue: accentWords('blue'),
+  purple: accentWords('lavender'),
+  pink: accentWords('rose'),
+  dark: /\bdark\b|black|สีดำ|สีเข้ม|โทนมืด/i,
+};
 
 const step = (key, value, by) => {
   const values = STYLE_FIELDS[key].values;
@@ -126,12 +204,14 @@ export function styleChanges(before, after, wish = '', profile = styleProfile())
     const hit = WISHES.find(([k, , re]) => k === key && re.test(text));
     if (hit) next[key] = step(key, profile[key], hit[1]);
   }
-  const accent = ACCENT_WORDS.find(([, re]) => re.test(text));
+  const accent = ACCENT_WORDS.find(([, re]) => affirmativeWish(text, re));
   if (accent) next.accent = accent[0];
   if (CONTRAST_WORDS.test(text)) next.contrast = 'high';
+  // Share the block lesson's direction check so the profile cannot learn the opposite wish.
   if (before && after) {
-    if (types(before).has('chart') && !types(after).has('chart')) next.charts = 'avoid';
-    else if (!types(before).has('chart') && types(after).has('chart')) next.charts = 'ok';
+    const direction = blockDirection(text, 'chart');
+    if (types(before).has('chart') && !types(after).has('chart') && direction === '-') next.charts = 'avoid';
+    else if (!types(before).has('chart') && types(after).has('chart') && direction === '+') next.charts = 'ok';
   }
   return Object.keys(STYLE_FIELDS).filter((k) => next[k] !== profile[k]).map((k) => ({ key: k, value: next[k] }));
 }
@@ -145,7 +225,7 @@ export function noteStyle(before, after, wish = heardWish()) {
 }
 
 export function noteRevise(before, after, wish = heardWish()) {
-  return [...reviseLessons(before, after).map(({ key, text }) => learn(key, text)), ...noteStyle(before, after, wish)];
+  return [...reviseLessons(before, after, wish).map(({ key, text }) => learn(key, text)), ...noteStyle(before, after, wish)];
 }
 
 export const noteKeep = (spec) => learn(`${kindOf(spec)}:kept`, `liked and kept the ${pageName(spec)} page layout`);
@@ -192,6 +272,7 @@ export const proactiveWatch = {
 export function forgetOnRequest(search = globalThis.location?.search || '') {
   if (!new URLSearchParams(search).has('forget')) return false;
   forgetLearned();
+  forgetLessons();
   resetStyle();
   try {
     globalThis.localStorage?.removeItem('agentos.memory');

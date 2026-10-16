@@ -10,7 +10,7 @@ test('every event type the browser logs is a known run log type', () => {
   const files = [...readdirSync(dir).map((f) => join(dir, f)), ...readdirSync(join(dir, 'scenes')).map((f) => join(dir, 'scenes', f))]
     .filter((f) => f.endsWith('.js'));
   const used = new Set(files.flatMap((f) => [...readFileSync(f, 'utf8').matchAll(/logEvent\('([a-z_]+)'/g)].map((m) => m[1])));
-  assert.ok(used.has('live_start') && used.has('page_check'));
+  assert.ok(used.has('live_start') && used.has('page_check') && used.has('lesson'));
   assert.deepEqual([...used].filter((t) => !LOG_TYPES.includes(t)), []);
 });
 

@@ -64,3 +64,14 @@ test('a long sentence before a scene still counts as speaking first', () => {
   ]);
   assert.deepEqual(r.flags.map((f) => f.kind), []);
 });
+
+test('lists the lessons the agent wrote, and which signals asked for one', () => {
+  const r = checkRun([
+    { t: 0, type: 'tool', name: 'render_ui', result: 'error: spec_json is not valid JSON' },
+    { t: 10, type: 'lesson', state: 'asked', signal: 'tool error' },
+    { t: 2000, type: 'lesson', state: 'noted', text: 'Write spec_json as one valid JSON object.' },
+  ]);
+  assert.deepEqual(r.lessonAsks, ['tool error']);
+  assert.deepEqual(r.lessons, [{ at: '+2.0s', text: 'Write spec_json as one valid JSON object.' }]);
+  assert.deepEqual(kinds(r), []);
+});

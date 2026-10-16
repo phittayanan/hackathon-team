@@ -74,12 +74,14 @@ export function agentConfig({ toolIds = [], voiceId = DEFAULT_VOICE, name = AGEN
         language: AGENT_LANGUAGE,
         // The page sends {{today}} at session start; the placeholder only covers a session without it.
         // The page sends {{memory}} (a few facts kept on the user's phone) and {{learned}}
-        // (preferences learned from how they use the app) too.
+        // (preferences learned from how they use the app) and {{lessons}} (rules the agent wrote
+        // after its own mistakes, lessons.js) too.
         dynamic_variables: {
           dynamic_variable_placeholders: {
             today: 'unknown (ask the user if a date matters)',
             memory: 'nothing yet (first visit)',
             learned: 'nothing yet',
+            lessons: 'nothing yet',
           },
         },
         prompt: {

@@ -38,6 +38,7 @@ Checked against `main` at `3b92022` (2026-10-16).
 | 19 | YouTube tutorial search | `public/js/youtube-search.js`, `public/js/scenes/video-search.js` | #47 |
 | 20 | Nearby places through Google Maps | `lib/places.js`, `public/js/scenes/places.js` ([notes](../web/PLACES.md)) | #53 |
 | 21 | Page versions: the agent and the page writer refer to an earlier version while changing a page; pages made for the phone screen | `public/js/page-history.js`, `public/js/scenes/generated.js`, `lib/page-model.js` | #61 |
+| 22 | Lessons from mistakes: a tool error, a failed layout check, a page the user turned down or a blind reply asks the agent for one rule (`note_lesson`), kept on the phone and sent as `{{lessons}}`; learned preferences keep only the changes the user's words asked for | `public/js/lessons.js`, `public/js/learn.js`, `public/js/live-agent.js`, `scripts/log-check.js` | #62 |
 
 ## Open pull requests
 

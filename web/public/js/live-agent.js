@@ -11,6 +11,7 @@ import { logEvent } from './log.js';
 import { apiFetch, goOffline, onOffline, micBlocked } from './api.js';
 import { sessionVariables } from './memory.js';
 import { noteHeard } from './learn.js';
+import { createLessonWatch } from './lessons.js';
 import { MAX_SESSION_SECONDS, IDLE_END_SECONDS } from './session-limits.js';
 import { ACCOUNT_BLOCKED } from './account-blocked.js';
 
@@ -29,6 +30,7 @@ let silenced = false;
 let micOpen = false;
 let limits = null; // { idle, max } timers of the running session
 let asleep = false; // a session ran and ended: the page shows it and waits to be called
+let watch = createLessonWatch(); // mistake signals of the running session (lessons.js)
 export const live = { available: false, connected: false, search: false };
 
 const setBrain = (brain) => {
@@ -189,6 +191,13 @@ async function sayThroughAgent(text, line, onStart) {
   if (started) await waitMode('listening', 15000);
 }
 
+// A mistake signal: ask the agent, silently, to write a lesson with note_lesson (lessons.js).
+function askLesson(signal) {
+  if (!signal || !conversation) return;
+  logEvent('lesson', { state: 'asked', signal: signal.kind });
+  conversation.sendContextualUpdate(signal.text);
+}
+
 // Wrap each tool so the agent always gets a text result, even if a handler throws.
 function wrapTools(handlers) {
   return Object.fromEntries(
@@ -203,6 +212,12 @@ function wrapTools(handlers) {
         }
         console.info(`[agent tool] ${name}`, params, '->', out);
         logEvent('tool', { name, params, result: out });
+        if (['render_ui', 'revise_ui'].includes(name) && !/^error/.test(out)) watch.pageShown();
+        // The lessons written, for npm run log:check (the team moves repeated ones into the prompt).
+        if (name === 'note_lesson' && out.startsWith('noted')) logEvent('lesson', { state: 'noted', text: String(params?.lesson || '').trim().slice(0, 120) });
+        // After the result, so the agent reads the note with its tool error in view.
+        const signal = watch.tool(name, out);
+        if (signal) setTimeout(() => askLesson(signal), 0);
         return out;
       },
     ]),
@@ -236,9 +251,10 @@ export function startLive(ui) {
       checkMic(),
     ]);
     let self = null;
+    watch = createLessonWatch();
     conversation = self = await Conversation.startSession({
       signedUrl: ticket.signedUrl,
-      // Fills {{today}} (Bangkok date from the server), {{memory}} and {{learned}} (kept on this phone).
+      // Fills {{today}} (Bangkok date from the server), {{memory}}, {{learned}} and {{lessons}} (kept on this phone).
       dynamicVariables: sessionVariables(ticket),
       connectionType: 'websocket',
       clientTools: wrapTools(createToolHandlers(ui)),
@@ -266,11 +282,13 @@ export function startLive(ui) {
           // v3 voices take audio tags like [happy]; they are for the voice, not the subtitle.
           showSubtitle(stripTags(message), 3200);
           logEvent('agent_reply', { text: stripTags(message) });
+          askLesson(watch.agent(stripTags(message)));
         } else {
           showSubtitle(`“${message}”`, 1400);
           logEvent('stt', { text: message, final: true });
           noteHeard(message);
           noteUser();
+          askLesson(watch.user(message));
         }
       },
       onModeChange: (m) => setMode(m?.mode ?? m),
@@ -323,8 +341,13 @@ export function setMic(on) {
 export function sendText(text) {
   noteUser();
   conversation?.sendUserMessage(text);
+  // Typed words (not taps on the page, which come as [scene event]) may turn a page down.
+  if (!text.startsWith('[')) askLesson(watch.user(text));
 }
-export const sendContext = (text) => conversation?.sendContextualUpdate(text);
+export function sendContext(text) {
+  conversation?.sendContextualUpdate(text);
+  askLesson(watch.context(text));
+}
 // A feed change: a contextual update alone does not give the agent a turn, so this sends it as a
 // marked message; the agent then speaks first or calls skip_turn.
 export const sendFeed = (text) => conversation?.sendUserMessage(`${text} (This is a feed update, not the user speaking.)`);

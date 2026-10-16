@@ -110,8 +110,11 @@ flowchart LR
   joins it through a signed URL from the server. The agent can change the
   screen only through client tools (`web/public/js/agent-tools.js`): open a
   scene, act on it, draw, revise or inspect a generated page, mark a page
-  urgent, keep a page, remember a fact, search videos, find places, and run
-  secretary actions.
+  urgent, keep a page, remember a fact, note a lesson, search videos, find
+  places, and run secretary actions. When the code sees a mistake (a tool
+  error, a failed layout check, the user turning a page down, the agent
+  saying it cannot see what the user means), a silent note asks the agent to
+  write one rule with `note_lesson` (`web/public/js/lessons.js`).
 - **Generated pages**: the agent describes a page as JSON built only from
   fixed components (text, checklist, chart, steps, call button, …). The
   browser draws it with `textContent` only. With the agent's design brief, a
@@ -165,8 +168,11 @@ No real money, mail or bookings. Everything below is demo data in
 Real: Shopify product results, Google Maps places and YouTube results. The
 agent's answers are live when it runs with keys. Saved pages stay in your own
 browser (`localStorage`). So does what the agent remembers about you (name,
-likes, last task) and what it learned from how you use it (for example "todo
-pages: give items due dates"). Open the site with `?forget=1` to start clean.
+likes, last task), what it learned from how you use it (for example "todo
+pages: give items due dates", saved only when you asked for that change),
+and up to five lessons it wrote after its own mistakes (for example "When
+asked to make a page prettier, change only its look and keep its content").
+Open the site with `?forget=1` to start clean.
 
 ## Repo map
 

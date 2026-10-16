@@ -93,8 +93,15 @@ export function checkRun(events) {
   // 6. Errors.
   for (const e of events.filter((x) => x.type === 'error')) flags.push({ kind: 'error', t: e.t, msg: `${e.where || e.src}: ${e.message}` });
 
+  // Lessons the agent wrote after a mistake (lessons.js): a lesson that comes back again and again
+  // is a mistake every user hits, so it belongs in the prompt or the code.
+  const lessons = events.filter((e) => e.type === 'lesson' && e.state === 'noted' && e.text).map((e) => ({ at: at(e.t), text: e.text }));
+  const asked = events.filter((e) => e.type === 'lesson' && e.state === 'asked').map((e) => e.signal);
+
   const count = (type) => events.filter((e) => e.type === type).length;
   return {
+    lessons,
+    lessonAsks: asked,
     durationS: events.length ? (events.at(-1).t - t0) / 1000 : 0,
     counts: { userTurns: turnEnds.length, agentAudio: audio.filter((a) => a.source === 'agent').length, localAudio: audio.filter((a) => a.source !== 'agent').length, tools: count('tool'), scenes: count('scene_open'), feeds: count('feed_event') },
     latency: latencies.length ? { median: latencies.sort((a, b) => a - b)[Math.floor(latencies.length / 2)], max: Math.max(...latencies) } : null,
@@ -116,6 +123,10 @@ function main() {
   console.log(`run ${basename(file)}: ${r.durationS.toFixed(0)} s, ${events.length} events`);
   console.log(`  user turns ${r.counts.userTurns}, agent audio ${r.counts.agentAudio}, local audio ${r.counts.localAudio}, tool calls ${r.counts.tools}, scenes ${r.counts.scenes}, feed events ${r.counts.feeds}`);
   if (r.latency) console.log(`  reply latency: median ${r.latency.median} ms, max ${r.latency.max} ms`);
+  if (r.lessonAsks.length || r.lessons.length) {
+    console.log(`  lessons: ${r.lessonAsks.length} asked (${[...new Set(r.lessonAsks)].join(', ') || 'none'}), ${r.lessons.length} written`);
+    for (const l of r.lessons) console.log(`  ${l.at.padStart(8)}  lesson: ${l.text}`);
+  }
   if (!r.flags.length) return console.log('  no problems found');
   console.log(`  ${r.flags.length} problem(s):`);
   for (const f of r.flags) console.log(`  ${f.at.padStart(8)}  ${f.kind}: ${f.msg}`);
