@@ -64,7 +64,7 @@ test('find_places opens the places page with a clean query and tells the agent t
   assert.match(await h.find_places({ query: ' ' }), /^error/);
   assert.equal(log.length, 0);
   const out = await h.find_places({ query: '  ร้าน   กาแฟ ' });
-  assert.match(out, /\[screen\] note/);
+  assert.match(out, /\[scene event\]/);
   assert.deepEqual(log.at(-1), ['open', 'places', { query: 'ร้าน กาแฟ' }]);
 });
 

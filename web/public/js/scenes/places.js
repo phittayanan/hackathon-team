@@ -1,6 +1,7 @@
 // Nearby places from Google Maps: asks the browser for the position, searches through our server
 // (/api/places, key on the server) and shows one card per place. Results reach the live agent as a
-// [screen] note so it speaks only about places that were found. Nothing here opens another app
+// [scene event], which starts its turn (a [screen] note would not), so it names the places found
+// even after it finished its "looking now" line. Nothing here opens another app
 // unless the user taps "ดูใน Google Maps" on a card.
 import { apiFetch } from '../api.js';
 import { currentPosition } from '../geo.js';
@@ -33,7 +34,8 @@ export default function mountPlaces(el, data, agent) {
 
   let facts = { query, near: null, results: null, error: null, searching: true };
   const controller = new AbortController();
-  const report = (prefix) => agent.tell?.(`[screen] ${prefix}: ${placesSummary(facts)}`);
+  // Live only (no label: offline the router already spoke). Nothing is sent once the page is closed.
+  const report = (prefix) => agent.event?.(`${prefix}: ${placesSummary(facts)} Tell the user now in one or two short sentences.`);
 
   (async () => {
     if (query.length < 2) throw new Error('ไม่ได้บอกว่าอยากหาอะไร');

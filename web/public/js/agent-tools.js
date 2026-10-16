@@ -49,7 +49,7 @@ export const TOOL_DEFS = [
     description:
       'Find real places near the user on Google Maps: cafes, restaurants, pharmacies, hospitals, ATMs, petrol stations and the like. ' +
       'Pass what to look for in the user\'s language, for example "ร้านกาแฟ" or "โรงพยาบาล". The page asks the browser for the user\'s position, ' +
-      'searches Google Maps and shows place cards (distance, rating, open now). The results arrive a few seconds later as a [screen] note: ' +
+      'searches Google Maps and shows place cards (distance, rating, open now). The results arrive a few seconds later as a [scene event] Places results message: ' +
       'wait for it, then name at most the top two. Never invent a place, distance, rating or opening time. You never see the user\'s coordinates.',
     params: {
       query: { type: 'string', description: 'What to find, 2 to 160 characters, without "near me"', required: true },
@@ -256,7 +256,7 @@ function createScreenHandlers(ui, learn) {
       const clean = typeof query === 'string' ? query.replace(/\s+/g, ' ').trim().slice(0, 160) : '';
       if (clean.length < 2) return 'error: provide what to find, at least 2 characters';
       await ui.openScene('places', { query: clean });
-      return `opened the Google Maps search for "${clean}"; say you are looking now; the places arrive as a [screen] note; do not name any place before it`;
+      return `opened the Google Maps search for "${clean}"; say you are looking now; the places arrive as a [scene event]; do not name any place before it`;
     },
     secretary_action({ action, minutes = '1' } = {}) {
       if (!SECRETARY_ACTIONS.includes(action) || (action === 'snooze' && !['1', '5'].includes(minutes))) return 'error: invalid secretary action';

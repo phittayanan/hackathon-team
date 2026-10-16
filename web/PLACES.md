@@ -9,13 +9,16 @@ rating, open now, address and a "ดูใน Google Maps" link. Nothing else op
 Flow: page -> `navigator.geolocation` (5 s, else no position) -> `POST /api/places
 {query, lat?, lng?}` -> `lib/places.js` -> Google Places API (New) Text Search
 (`places:searchText`, `languageCode: th`, `regionCode: TH`, 5 km location bias) -> cards ->
-a `[screen] Places results` note to the live agent, which then names the top places.
+a `[scene event] Places results` message to the live agent. A scene event starts the agent's
+turn (a `[screen]` note would not), so it names the top places even when they arrive after its
+"looking now" line. Closing the page first sends nothing.
 
 Privacy: the coordinates go to our server and Google for that one search only. They are not
 logged, not stored and never sent to the agent; the agent hears names, distances, ratings and
 open now. Places content is not cached (Google Maps Platform terms).
 
-Setup: put `GOOGLE_MAPS_API_KEY` in `web/.env` locally and in the Vercel project's environment
+Setup: put `GOOGLE_MAPS_API_KEY` in the repo-root `.env` (next to `.env.example`; `server.js`
+loads only that one) locally and in the Vercel project's environment
 variables. In Google Cloud Console, restrict the key to Places API (New) and set a daily quota
 cap. Without a key the page shows "ยังไม่ได้ตั้งค่า GOOGLE_MAPS_API_KEY" and the agent says the
 search failed. Every search counts against the daily `calls` limit (lib/usage.js).
