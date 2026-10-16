@@ -56,6 +56,10 @@ const pairs = [
   ['Q-Bot กำลังทำงาน', 'Q-Bot working'], ['Q-Bot กำลังฉลอง', 'Q-Bot celebrating'], ['Q-Bot เป็นห่วง', 'Q-Bot concerned'],
   ['ค้นหาวิดีโอบน YouTube', 'Search YouTube videos'], ['เปิดผลการค้นหา', 'Open search results'],
   ['เปิดผลการค้นหาล่าสุด แล้วเลือกคลิปที่ต้องการ', 'Open the latest results and choose a video'],
+  ['เปิดผลการค้นหาใน YouTube', 'Open results on YouTube'], ['เปิดใน YouTube', 'Open on YouTube'],
+  ['← กลับไปที่รายการ', '← Back to the list'], ['กำลังหาคลิป…', 'Finding videos…'],
+  ['ดึงรายการคลิปไม่ได้ตอนนี้ · กดเปิดผลการค้นหาใน YouTube แทนได้', 'No video list right now · open the results on YouTube instead'],
+  ['ไม่พบคลิป · ลองเปิดผลการค้นหาใน YouTube', 'No videos found · try the results on YouTube'],
 ];
 const dictionary = new Map(pairs.flatMap((pair) => pair.map((word) => [word, pair])));
 let language = 'th';

@@ -54,7 +54,7 @@ test('search_videos opens only a validated YouTube results URL and reports its l
   assert.match(await h.search_videos({ query: 'x' }), /^error/);
   assert.equal(log.length, 0);
   const out = await h.search_videos({ query: 'rubric' });
-  assert.match(out, /no individual video was fetched or verified/);
+  assert.match(out, /no video was watched or verified/);
   assert.deepEqual(log.at(-1), ['open', 'video-search', { query: "Rubik's Cube" }]);
 });
 

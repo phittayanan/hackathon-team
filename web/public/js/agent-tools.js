@@ -37,9 +37,10 @@ export const TOOL_DEFS = [
   {
     name: 'search_videos',
     description:
-      'Find tutorial videos by opening YouTube search results. Use when the user asks to find, recommend, or watch a video/tutorial. ' +
+      'Find tutorial videos: opens a screen listing YouTube search results (title and channel); the user taps one to play it in the app. ' +
+      'Use when the user asks to find, recommend, or watch a video/tutorial. ' +
       'Pass concise search terms in the user\'s language; for Rubik\'s Cube tutorials use spelling "Rubik\'s Cube". ' +
-      'This opens YouTube results in a new tab; it does not fetch or rank individual videos. Never claim you watched or verified a specific video.',
+      'The list comes from YouTube search ranking; a [screen] note tells you the titles. Never claim you watched or verified a video.',
     params: {
       query: { type: 'string', description: 'Concise video search terms, 2 to 160 characters', required: true },
     },
@@ -238,7 +239,7 @@ function createScreenHandlers(ui, learn) {
       const result = videoQueryFromRequest(query);
       if (!result) return 'error: provide a video search query of at least 2 characters';
       await ui.openScene('video-search', { query: result.query });
-      return `opened YouTube search results for "${result.query}"; tell the user to choose a video from the results; no individual video was fetched or verified`;
+      return `opened a list of YouTube results for "${result.query}"; tell the user to tap a video to play it; titles arrive in a [screen] note; no video was watched or verified`;
     },
     secretary_action({ action, minutes = '1' } = {}) {
       if (!SECRETARY_ACTIONS.includes(action) || (action === 'snooze' && !['1', '5'].includes(minutes))) return 'error: invalid secretary action';
