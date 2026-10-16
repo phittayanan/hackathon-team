@@ -5,7 +5,9 @@
 // by the model never run; taps on data-action reach the agent as [scene event] lines through this code.
 // Other changes the user makes by hand (a ticked item, a counter, a toggle) reach the live agent as a
 // silent [screen] update with what the page shows now; the spec in memory follows them.
-// No answer, an error, a timeout or a page that fails the checks: the block page stays.
+// No answer, an error, a timeout or a page that fails the checks: the block page stays. Once the finished
+// page has painted (and when a kept page reopens), its boxes are measured and checked (page-check.js):
+// any failure brings the block page back, logs one [page check] line and tells the live agent silently.
 // The agent asks if the user likes it; spoken answers revise the spec and it redraws in place.
 // A page the user likes can be kept as a saved scene in localStorage (with its HTML, if it had one).
 import { T } from '../timing.js';
@@ -13,6 +15,8 @@ import { apiFetch } from '../api.js';
 import { sanitizePage, sanitizePartial, pageOk } from '../page-sanitize.js';
 import { applyStyle, styleText } from '../style.js';
 import { changeNote, markDone } from '../genui.js';
+import { checkPage, failureText } from '../page-check.js';
+import { logEvent } from '../log.js';
 
 // The browser waits a little longer than the server's own 12 s limit (lib/page-model.js).
 const PAGE_WAIT_MS = 14_000;
@@ -24,6 +28,9 @@ const PAGE_CSS =
   '[data-action],[data-toggle],[data-count-step]{cursor:pointer}';
 
 const STORE = 'agentos.savedScenes';
+const TAP = '[data-action],[data-toggle],[data-count-step],button,a';
+const MAX_BOXES = 800; // elements measured per page; a model page is far smaller
+const nextFrame = () => new Promise((done) => requestAnimationFrame(() => done()));
 
 export function loadSaved() {
   try {
@@ -238,6 +245,37 @@ function wirePage(root, agent, changed) {
   });
 }
 
+// Measure a painted model page for page-check.js: one box per element under the wrapper (nothing
+// inside an <svg>), relative to the frame, in CSS px even while the scene is scaled (the g-flash swap).
+function measurePage(host) {
+  const body = host.shadowRoot?.querySelector('.pg-body');
+  if (!body) return null;
+  const frame = host.getBoundingClientRect();
+  const scale = host.offsetWidth ? frame.width / host.offsetWidth || 1 : 1;
+  const rel = (r) => ({ x: (r.left - frame.left) / scale, y: (r.top - frame.top) / scale, width: r.width / scale, height: r.height / scale });
+  const index = new Map();
+  const boxes = [];
+  for (const node of body.querySelectorAll('*')) {
+    if (boxes.length >= MAX_BOXES) break;
+    if (node.parentElement?.closest('svg')) continue;
+    const css = getComputedStyle(node);
+    const inline = css.display === 'inline';
+    index.set(node, boxes.length);
+    boxes.push({
+      parent: index.get(node.parentElement) ?? -1,
+      tag: node.localName,
+      text: [...node.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.data).join(' '),
+      rect: rel(node.getBoundingClientRect()),
+      rects: inline ? [...node.getClientRects()].slice(0, 20).map(rel) : undefined,
+      fontSize: parseFloat(css.fontSize) || 0,
+      display: css.display,
+      visibility: css.visibility,
+      tap: node.matches(TAP),
+    });
+  }
+  return { boxes, viewport: { width: host.clientWidth, height: window.innerHeight, contentWidth: body.scrollWidth } };
+}
+
 export default function mountGenerated(el, data, agent) {
   let fromSaved = false;
   let spec = data.spec;
@@ -279,6 +317,20 @@ export default function mountGenerated(el, data, agent) {
       change = `set "${count.name}" to ${count.value}`;
     }
     if (!tapped) tell(change);
+  };
+
+  // The finished model page on screen passes the layout checks. On a failure: one [page check] log
+  // line and a silent note to the live agent; the caller goes back to the block page. No retry.
+  const pageFits = () => {
+    if (view !== 'html' || !host?.isConnected) return true;
+    const measured = measurePage(host);
+    if (!measured) return true;
+    const fails = checkPage(measured.boxes, measured.viewport, spec);
+    if (!fails.length) return true;
+    const why = failureText(fails);
+    logEvent('page_check', { text: `[page check] block page kept: ${why}`, kind: spec.kind, failures: fails });
+    agent.tell?.(`[screen] The designed page was replaced by the simple page because: ${why}`);
+    return false;
   };
 
   const paint = () => {
@@ -378,9 +430,12 @@ export default function mountGenerated(el, data, agent) {
       if (pending !== stop) return;
       const out = sanitizePage(raw);
       if (!pageOk(out)) throw new Error('page failed the checks');
-      pageRaw = raw;
       shown = out.html;
       setView('html');
+      await nextFrame();
+      if (pending !== stop) return;
+      if (!pageFits()) throw new Error('page failed the layout check');
+      pageRaw = raw;
     } catch (err) {
       if (pending !== stop) return;
       console.info('[page] block page kept:', err.message);
@@ -393,6 +448,16 @@ export default function mountGenerated(el, data, agent) {
     }
   }
   if (!pageRaw) fetchPage();
+  else {
+    // A kept page is checked the same way; it falls back to its block page, with no new model call.
+    nextFrame().then(() => {
+      if (!pageRaw || pageFits()) return;
+      console.info('[page] block page kept: kept page failed the layout check');
+      pageRaw = null;
+      shown = null;
+      setView('blocks');
+    });
+  }
 
   // The offline todo asks its question after it has grown (the intro line said what it was doing).
   if (stage === 'review' && data.ask) agent.say(data.ask);
