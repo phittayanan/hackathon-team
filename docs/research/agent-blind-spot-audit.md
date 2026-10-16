@@ -104,3 +104,65 @@ The code-read audit prompt (appendix) is the best first method here:
 the gaps in this app live in the browser handlers and the page's messages, which every hosted test only mocks.
 A mock returns whatever you type, so it cannot show that the real handler says `opened payment` and nothing more.
 Reading the code finds that; a simulation test then proves the fix.
+
+## Part 2. Audit of this codebase
+
+Method: the audit prompt in the appendix, run by hand over the code on `main` at `fb9a497`, reading code only.
+No agent was run, no ElevenLabs call was made. "Agent" means the live ElevenLabs agent (Q-Bot).
+Line numbers are for that commit.
+
+### What the agent receives, channel by channel
+
+| Channel | Where | What the agent gets back | What the user sees that the agent does not |
+| --- | --- | --- | --- |
+| `open_scene` | `web/public/js/agent-tools.js:222-229` | `opened <scene>` | merchant, items, total, rules check result (payment); flight codes and times; race form; catalog products and errors |
+| `scene_action` | `agent-tools.js:231-245` | `closed`, `<action> done on <scene>`, or the payment refusal | whether the scene did anything at all (training and catalog ignore it) |
+| `render_ui` | `agent-tools.js:247-262` | `page shown; now ask…` / `first-aid page shown` / reopen line | the drawn page (design model redraws freely) — **known, fix in progress** |
+| `revise_ui` | `agent-tools.js:264-277` | `page redrawn` | the redrawn page — **known, fix in progress** |
+| `mark_urgent` | `agent-tools.js:279-286` | `marked <level>` or `no page is open …; do nothing more` | — |
+| `keep_scene` | `agent-tools.js:289-299` | `kept "<name>" …` plus a `[screen]` kept-pages note | — |
+| `remember` | `agent-tools.js:167-173` | `remembered <key>; do not mention it` | — |
+| `secretary_action` | `agent-tools.js:216-220`, `app.js:167-173` | the whole sample store as JSON | — (best-covered tool) |
+| `skip_turn` | `web/agent/config.js:91-98` | system tool | — |
+| `[screen] … page was closed` | `app.js:92` (contextual update) | which scene closed | — |
+| `[screen] Pages the user kept …` | `agent-tools.js:153-156`, `live-agent.js:279-280` | kept pages and how to reopen | — |
+| `[screen] The user changed what you remember` | `scenes/memory.js:45` | the change | — |
+| `[scene event: <line>] Say this …` | `live-agent.js:181`, via `voice.js:99-103` | one fixed Thai sentence (e.g. `pay_done`) | the amount paid, the flight booked, the race entered |
+| `[scene event] The user tapped …` | `app.js:48-54`, `scenes/generated.js:224` | the tapped label and action on a generated page | ticks and typing on generated pages — **known, fix in progress** |
+| `[feed update] …` | `agent-loop.js:170`, `live-agent.js:316` | feed change plus user context; only when idle (`agent-loop.js:29`) | — |
+| `[session start] …` | `app.js:343, 362` | greet with memory | which page is open, if any |
+| Typed or spoken text | `app.js:192`, `live-agent.js:309-311` | the words | — |
+
+### Gaps, sorted by severity
+
+Severity: **judges would notice** (likely in a 3-minute demo), **sometimes** (needs a natural but less common turn), **rare**.
+
+| # | Severity | Where | User story | Smallest fix |
+| --- | --- | --- | --- | --- |
+| 1 | judges would notice | `web/public/js/live-agent.js:275-280`, `web/public/js/session-limits.js:3-5` | The user reads a drawn page for 25 s, then says "เพิ่มนมด้วย"; the session ended after 20 s idle, the new session starts knowing only memory and kept pages, so the agent does not know a page is open or what is on it. | In `startLive`, if a scene is open, send `[screen] The <name> page is open: <one-line summary>` with the kept-pages note. |
+| 2 | judges would notice | `web/public/js/agent-tools.js:228` | On the payment card the user asks "ยอดเท่าไหร่" or "ทำไมกด Allow ไม่ได้"; the agent got only `opened payment`, so it cannot say the total or which rule failed, and the prompt forbids guessing prices (`web/agent/prompt.md:70`). | Return a one-line summary from the scene (merchant, total, each rule ✓/✕; flight codes and times) instead of `opened <scene>`. |
+| 3 | judges would notice | `web/public/js/scenes/shopping-catalog.js:28-50, 41-44, 56` | After a product search the user asks "อันไหนถูกสุด" or "ตัวที่เลือกแล้วส่งไทยไหม"; the results, the search error and the "เลือกรายการนี้" tap never reach the agent, and `state()` returns only `{catalog:true}`. | When results land, `tellAgent` titles, sellers and prices (or the error); send the choose tap as `agent.event`. |
+| 4 | sometimes | `web/public/js/app.js:59-85` (swap path 66-73), `web/public/js/scenes/shopping.js:29, 53`, `web/public/js/app.js:139-144, 277-280` | The shopping list checks out by itself into the payment card, or the presenter opens a scene by hotkey; the user asks "อันนี้คืออะไร"; the agent still thinks the shopping list (or the home) is showing, because `openScene` never sends a `[screen]` note — only `closeScene` does. | In `openScene`, when live, send `[screen] The <name> page is open` (and which page it replaced). |
+| 5 | sometimes | `web/public/js/agent-tools.js:242-244`, `web/public/js/scenes/training.js:86`, `web/public/js/scenes/shopping-catalog.js:56` | On the catalog or training page the user says "ตกลง เอาอันนี้"; the agent calls `scene_action confirm`, gets `confirm done on shopping`, tells the user it is done, and nothing happened. | Have `ui.action` report whether the scene handled the action; return `error: this page has no <action>` when not. |
+| 6 | sometimes | `web/agent/prompt.md:57-60`, `web/public/js/agent-tools.js:281` | The user says "นิ้วเลือดออก"; the prompt bullet is headed `mark_urgent`, so the agent may call it first; with no page open it gets `…; do nothing more` and draws no first-aid page. | Head the bullet with `render_ui` and change the no-page result to "call render_ui with urgency first". |
+| 7 | sometimes | `web/agent/prompt.md:31-32` vs `prompt.md:54-55`, `web/public/js/app.js:53`, `web/public/js/live-agent.js:181` | The user taps a button on a generated page; the message starts `[scene event]`, which line 31 says means "say the given sentence … and nothing more", while line 54 says act on it; the agent may just echo the label. | Give taps their own tag (for example `[tap]`) and name it once in the prompt. |
+| 8 | sometimes | `web/public/js/agent-tools.js:53` (`data_json` "in the shape of the defaults"), `web/public/js/data.js:3-9`, `web/public/js/app.js:84` | The user says "จ่ายค่าไฟ 800 บาท"; the agent opens `payment` with guessed keys, the card merges them over the FreshMart defaults and shows ฿849 FreshMart items, and the agent, told only `opened payment`, says 800. | List the real keys in the tool description (`merchant`, `items:[{name,qty,price}]`, `total`, `method`) and return the total shown. |
+| 9 | sometimes | `web/public/js/live-agent.js:181`, `web/public/js/scenes/payment.js:52, 61`, `flight.js:58, 65`, `training.js:80` | After the Allow tap the user asks "จ่ายไปเท่าไหร่ ร้านไหน"; the agent only got the fixed sentence `pay_done`, not the amount or merchant. | Add the facts to the scene-event header, e.g. `[scene event: pay_done, paid ฿849 to FreshMart Online]`. |
+| 10 | known, fix in progress | `web/public/js/agent-tools.js:254, 261, 276`, `web/public/js/scenes/generated.js` | User: "ในลิสต์มีอะไรบ้าง" after `render_ui`/`revise_ui`; agent got `page shown` / `page redrawn`. | Being fixed in the PR `fix: Q-Bot knows what is on the page it made`. Check that it also covers the kept-page reopen at line 254, which returns only the page name. |
+| 11 | rare | `web/agent/prompt.md:106-108`, `web/public/js/live-agent.js:313-315` | The prompt says to answer a `[screen]` close note with `skip_turn`, but `[screen]` goes as a contextual update, which (per the code's own comment at line 314) gives the agent no turn; the line is dead and costs prompt tokens. | Drop the `skip_turn` sentence from the `[screen]` paragraph. |
+| 12 | rare | `web/public/js/agent-tools.js:108-111`, `web/public/js/live-agent.js:29, 67`, `web/public/js/app.js:188` vs `web/agent/prompt.md:56` | Code keeps a `sources` block, a `live.search` flag and a "web search can take a while" comment, but there is no search tool and the prompt says search is unavailable; no user-facing failure, only confusion for the next editor. | Leave as is for the demo; remove the dead search paths after. |
+| 13 | rare | `web/agent/config.js:39-49` (no `tool_error_handling_mode` set), `web/public/js/live-agent.js:192-198` | A tool runs past `response_timeout_secs: 10` (`config.js:44`); by the SDK field description the default mode hides client-tool errors, so the agent may never learn the call failed and say the page is up. Handler throws are already turned into `error: …` strings, so only timeouts are exposed. | Set `tool_error_handling_mode: 'passthrough'` on each client tool after checking the field on the ElevenLabs API reference. |
+
+### Prompt against tools
+
+- Every client tool in `TOOL_DEFS` (`agent-tools.js:35-104`) and `skip_turn` (`config.js:91-98`) is named in the prompt. No tool is unexplained.
+- No instruction names a tool that does not exist. Mismatches found are wording, not names: gap 6 (`mark_urgent` heads a bullet that is about `render_ui`), gap 7 (one tag, two meanings), gap 11 (a turn the agent never gets).
+- One field is under-explained: `data_json` (gap 8). The prompt gives its shape only for the catalog.
+- Checked and true: "You only get feed updates when no scene is open and nobody is talking" (`prompt.md:104`) matches `agent-loop.js:29`.
+
+### What the agent cannot undo or check
+
+- It cannot undo `scene_action confirm` on flight (`flight.js:42-61`): the scene books and closes itself.
+- It cannot stop the training sign-up: it fills and submits itself with no tap (`training.js:51-83`); `scene_action` has no handler there (gap 5).
+- It cannot check that a `remember` or `keep_scene` stuck beyond the result line; that is fine.
+- It can never approve a payment (`agent-tools.js:234-237`, `payment.js` Allow tap only). This is by design and correct.
