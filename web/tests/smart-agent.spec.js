@@ -50,7 +50,7 @@ test('memory: a first visit sends "nothing yet"; remember and a finished task ar
 
   expect(await tool(page, 'remember', { key: 'name', value: 'Ploy' })).toMatch(/^remembered name/);
   expect(await tool(page, 'remember', { key: 'likes', value: 'running' })).toMatch(/^remembered likes/);
-  expect(await tool(page, 'open_scene', { scene: 'training' })).toBe('opened training');
+  expect(await tool(page, 'open_scene', { scene: 'training' })).toMatch(/^opened training: Sleep score 86/);
   expect(await memory(page)).toEqual({ name: 'Ploy', likes: 'running', last_task: '10K training plan and race sign-up' });
 
   // Next visit: the agent gets what it learned at session start.
@@ -83,7 +83,7 @@ test('plan line: shown with the first tool call, ticks as tools finish, fades wh
   const plan = page.locator('[data-testid=plan]');
   const states = () => plan.locator('li').evaluateAll((lis) => lis.map((li) => li.dataset.state));
 
-  expect(await tool(page, 'open_scene', { scene: 'shopping', plan: 'อ่านอีเมล|ทำลิสต์|รอคุณกด Allow' })).toBe('opened shopping');
+  expect(await tool(page, 'open_scene', { scene: 'shopping', plan: 'อ่านอีเมล|ทำลิสต์|รอคุณกด Allow' })).toMatch(/^opened shopping: Shopping list at FreshMart Online/);
   await expect(plan).toHaveClass(/show/);
   await expect(plan.locator('li')).toHaveText(['✓ อ่านอีเมล', '2 ทำลิสต์', '3 รอคุณกด Allow']);
   expect(await states()).toEqual(['done', 'now', 'next']);

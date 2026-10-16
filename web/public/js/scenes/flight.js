@@ -1,10 +1,6 @@
 // Proactive flight-delay card. The agent speaks first and offers a faster flight.
 // Yes (button or voice) books the new one; the timeline re-routes, then it folds home.
-const addMinutes = (hhmm, mins) => {
-  const [h, m] = hhmm.split(':').map(Number);
-  const t = h * 60 + m + mins;
-  return `${String(Math.floor(t / 60) % 24).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
-};
+import { addMinutes, flightSummary } from '../scene-summary.js';
 
 export default function mountFlight(el, data, agent) {
   const { old, proposed } = data;
@@ -70,6 +66,7 @@ export default function mountFlight(el, data, agent) {
   el.querySelector('[data-testid=keep]').addEventListener('click', () => keep(true));
 
   return {
+    summary: () => flightSummary(data),
     onAction(action) {
       if (action === 'confirm') yes();
       // The router already speaks the "keep" line for a spoken no.

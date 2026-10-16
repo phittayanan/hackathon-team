@@ -1,6 +1,8 @@
 // Proactive training page: sleep score, run plan and a 10K race card.
 // The race card turns into a sign-up form that fills itself and submits,
 // all inside our own UI (no outside website). Ends with the mascot on a treadmill and confetti.
+import { trainingSummary } from '../scene-summary.js';
+
 export default function mountTraining(el, data, agent) {
   const { race, runner } = data;
   const fields = [
@@ -82,5 +84,5 @@ export default function mountTraining(el, data, agent) {
     agent.close();
   })();
 
-  return {};
+  return { summary: () => trainingSummary(data) };
 }

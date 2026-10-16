@@ -1,5 +1,6 @@
 // Shopping list built item by item from a (fake) email, then it slides up into the payment card.
 import { mountCatalog } from './shopping-catalog.js';
+import { shoppingSummary } from '../scene-summary.js';
 const baht = (n) => `฿${Number(n).toLocaleString('en-US')}`;
 
 export default function mountShopping(el, data, agent) {
@@ -55,6 +56,7 @@ export default function mountShopping(el, data, agent) {
   })();
 
   return {
+    summary: () => shoppingSummary(data),
     onAction(action) {
       if (action === 'confirm') checkout();
     },

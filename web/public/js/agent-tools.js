@@ -234,7 +234,10 @@ function createScreenHandlers(ui, learn) {
       if (data === null) return 'error: data_json is not valid JSON';
       await ui.openScene(scene, data);
       learn.agentOpened(scene);
-      return `opened ${scene}`;
+      // The scene's facts (total and rules, flight times, …), so the agent never guesses them.
+      const open = ui.current?.();
+      const summary = open?.name === scene ? open.ctl?.summary?.() : '';
+      return summary ? `opened ${scene}: ${summary}` : `opened ${scene}`;
     },
 
     scene_action({ action } = {}) {
