@@ -7,7 +7,7 @@ import { join } from 'node:path';
 export const LOG_TYPES = [
   'run_start', 'page_open', 'mic', 'stt', 'user_text', 'agent_reply', 'tool', 'audio_start', 'audio_end',
   'scene_open', 'scene_close', 'feed', 'feed_event', 'decision', 'push', 'route', 'error', 'greet',
-  'offline', 'limit', 'suggestion', 'search',
+  'offline', 'limit', 'suggestion', 'search', 'live_start', 'live_end', 'page_check', 'page_tap',
 ];
 
 function browserEvents(events, now, write) {

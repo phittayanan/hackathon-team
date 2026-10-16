@@ -12,7 +12,7 @@ import { createUsage, LimitError } from './usage.js';
 import { searchShopifyCatalog } from './shopify-catalog.js';
 import { searchPlaces } from './places.js';
 import { searchReady, tavilySearch } from './search.js';
-import { pageReady, streamPage, PAGE_TIMEOUT_MS } from './page-model.js';
+import { pageReady, streamPage, cleanPageExtras, PAGE_TIMEOUT_MS } from './page-model.js';
 import { validateSpec } from '../public/js/genui.js';
 
 export class HttpError extends Error {
@@ -126,10 +126,11 @@ export function createHandlers({
       if (out.error && !out.quiet) runLog.server('error', { where: 'image', message: out.error });
       return out;
     },
-    // A free HTML page for a generated scene, written by the page model from { spec, design, style }.
+    // A free HTML page for a generated scene, written by the page model from { spec, design, style }, plus
+    // screen (the page area), base (the look being changed) and reference (an earlier version named).
     // -> async iterator of raw HTML text (the browser sanitizes it) or an HttpError before it starts.
     // The time limit ends the text early; the browser then keeps the block page.
-    async page(headers = {}, { spec, design, style } = {}, { signal } = {}) {
+    async page(headers = {}, { spec, design, style, screen, base, reference } = {}, { signal } = {}) {
       if (!pageReady(accounts)) throw new HttpError(503, 'no ElevenLabs key');
       const clean = validateSpec(spec);
       if (!clean) throw new HttpError(400, 'spec has no usable blocks');
@@ -141,7 +142,13 @@ export function createHandlers({
       try {
         // The page writer in the first account with credit; out of credit before the first text -> the next account.
         // style: the user's design system line from the phone; only a string, cut to 200 characters.
-        const request = { spec: clean, design: String(design || '').slice(0, 600), style: typeof style === 'string' ? style.slice(0, 200) : '' };
+        // screen, base and reference come from the browser: checked and cut in cleanPageExtras.
+        const request = {
+          spec: clean,
+          design: String(design || '').slice(0, 600),
+          style: typeof style === 'string' ? style.slice(0, 200) : '',
+          ...cleanPageExtras({ screen, base, reference }),
+        };
         const text = await accounts.run('page', (a) => streamPage(request, envFor(env, a), { fetchImpl, WebSocketImpl, signal: stop.signal }), 'page');
         return (async function* () {
           try {

@@ -248,6 +248,9 @@ export function startLive(ui) {
         // A late disconnect of an old session must not end a newer one.
         if (conversation && conversation !== self) return;
         // The agent ended it (silence or max duration) or the line dropped: sleep until called.
+        // The run log marks it (endLive already did when the page ended it): the next session starts
+        // with no memory of this conversation.
+        if (!asleep) logEvent('live_end', { why: 'disconnect', reason: String(details?.reason ?? '').slice(0, 80) });
         if (self) asleep = true;
         sessionGone();
       },
@@ -273,6 +276,7 @@ export function startLive(ui) {
       onModeChange: (m) => setMode(m?.mode ?? m),
     });
     conversation.setMicMuted(true);
+    logEvent('live_start', {});
     live.connected = true;
     asleep = false;
     setBrain('agent');

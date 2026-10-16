@@ -37,6 +37,7 @@ Checked against `main` at `3b92022` (2026-10-16).
 | 18 | The agent sees the open scene and its facts | `public/js/scene-summary.js` | #48 |
 | 19 | YouTube tutorial search | `public/js/youtube-search.js`, `public/js/scenes/video-search.js` | #47 |
 | 20 | Nearby places through Google Maps | `lib/places.js`, `public/js/scenes/places.js` ([notes](../web/PLACES.md)) | #53 |
+| 21 | Page versions: the agent and the page writer refer to an earlier version while changing a page; pages made for the phone screen | `public/js/page-history.js`, `public/js/scenes/generated.js`, `lib/page-model.js` | #61 |
 
 ## Open pull requests
 

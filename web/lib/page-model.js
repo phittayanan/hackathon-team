@@ -46,13 +46,17 @@ export const SYSTEM_PROMPT = [
   '- No links (they are removed). Do not invent facts beyond the content you are given.',
   '',
   'Design:',
-  '- Make every page look different. Pick ONE strong layout idea and visual idea that fits the brief, for example:',
+  '- A new page: make it look different from other pages. Pick ONE strong layout idea and visual idea that fits the brief, for example:',
   `  ${LAYOUTS.join(', ')}. Avoid a plain column of identical cards.`,
+  '- A change (the request has "Current page"): it is the same page, changed. Keep its layout idea and colours and change',
+  '  only what the brief asks. "Earlier version" is a page the user points at: take from it only what the brief names.',
   '- Base: the app colours as CSS variables (already defined, use var()): --cream #f6efe4, --cream-2 #efe3d0, --ink #2b2420,',
   '  --ink-2 #6f645b, --accent #ff7a59, --accent-2 #ffb36b, --ok #23a26d, --bad #d9534f, --card #fffdf9, --sky #dcecff, --radius 22px,',
   '  font: var(--font) (system font with Noto Sans Thai). You may add colours that fit the brief\'s mood.',
   '- Thai text first (the content is usually Thai already); short English only where the content has it.',
-  '- Works at phone width (360 px) and desktop (1200 px): fluid widths, CSS grid/flex, a @media query for wide screens.',
+  '- The page is shown on a phone screen, in the page area the request gives (about 340 px wide and portrait on most screens).',
+  '  Design for that size: one main column, fluid widths, CSS grid/flex. No @media queries: they read the browser window,',
+  '  not the phone screen. To adapt, use @container queries: the page root is an inline-size container.',
   '- Every tap target at least 44 px tall and wide. Text contrast at least WCAG AA (4.5:1, large text 3:1).',
   '- The page sits under the app\'s own header; leave about 72 px free at the bottom for the app\'s mic bar.',
   '- Keep it compact: at most about 9 KB of HTML. No comments.',
@@ -60,9 +64,36 @@ export const SYSTEM_PROMPT = [
   'App pictures: ' + Object.entries(PICTURES).map(([p, d]) => `${p} (${d})`).join('; ') + '.',
 ].join('\n');
 
+// What the browser may add to a page request, checked and cut (the browser is not trusted):
+// screen { width, height } in CSS px; base and reference { v, look, palette: ['#rrggbb'], brief }.
+const MAX_SIDE_PX = 4000;
+function cleanVersion(x) {
+  if (!x || typeof x !== 'object' || typeof x.look !== 'string' || !x.look.trim()) return null;
+  const palette = (Array.isArray(x.palette) ? x.palette : []).filter((c) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)).slice(0, 5);
+  const v = Number.isInteger(x.v) && x.v > 0 && x.v < 1000 ? x.v : null;
+  return { v, look: x.look.slice(0, 300), palette, brief: typeof x.brief === 'string' ? x.brief.slice(0, 300) : '' };
+}
+export function cleanPageExtras({ screen, base, reference } = {}) {
+  const side = (n) => (Number.isFinite(n) && n >= 200 && n <= MAX_SIDE_PX ? Math.round(n) : null);
+  const width = side(screen?.width);
+  const height = side(screen?.height);
+  return {
+    screen: width && height ? { width, height } : null,
+    base: cleanVersion(base),
+    reference: cleanVersion(reference),
+  };
+}
+
+const versionLine = (x) => [
+  `looks like: ${x.look}`,
+  x.palette.length ? `colours: ${x.palette.join(', ')}` : '',
+  x.brief ? `its brief was: ${x.brief}` : '',
+].filter(Boolean).join('; ');
+
 // The user message: the brief plus the spec's content (title and blocks; the app draws the choice chips itself).
 // style: the user's design system as one line (public/js/style.js styleText), after the brief.
-export function pagePrompt(spec, design, style) {
+// extras (cleanPageExtras): the page area; base = the page being changed; reference = an earlier version named.
+export function pagePrompt(spec, design, style, { screen = null, base = null, reference = null } = {}) {
   const content = {
     title: spec.title,
     subtitle: spec.subtitle || undefined,
@@ -72,6 +103,9 @@ export function pagePrompt(spec, design, style) {
   return [
     `Design brief: ${String(design || 'A clear, friendly page for this content.').slice(0, 600)}`,
     ...(style ? [`User's design system: ${String(style).slice(0, 200)}`] : []),
+    ...(screen ? [`Page area: ${screen.width}x${screen.height} px on a phone screen, ${screen.height >= screen.width ? 'portrait' : 'landscape'}.`] : []),
+    ...(base ? [`Current page (this request changes it): ${versionLine(base)}`] : []),
+    ...(reference ? [`Earlier version${reference.v ? ` v${reference.v}` : ''} the user points at: ${versionLine(reference)}`] : []),
     'Content (JSON; show all of it, as real UI, not as JSON). A "button" block becomes a <button data-action>.',
     JSON.stringify(content),
   ].join('\n');
@@ -88,7 +122,7 @@ export class PageModelError extends Error {
 // so the caller tries the next account), then returns an async iterator of text pieces.
 // Text before the first "<" (a ```html fence) is dropped. The signal stops it (time limit, visitor left).
 // env: ELEVENLABS_API_KEY and ELEVENLABS_AGENT_ID (the page writer's id) of one account.
-export async function streamPage({ spec, design, style }, env = process.env, { fetchImpl = fetch, WebSocketImpl = globalThis.WebSocket, signal } = {}) {
+export async function streamPage({ spec, design, style, ...extras }, env = process.env, { fetchImpl = fetch, WebSocketImpl = globalThis.WebSocket, signal } = {}) {
   if (!WebSocketImpl) throw new PageModelError('no global WebSocket (Node 22 or later)');
   const url = await signedUrl(env, fetchImpl, signal);
   signal?.throwIfAborted();
@@ -121,7 +155,7 @@ export async function streamPage({ spec, design, style }, env = process.env, { f
     try { event = JSON.parse(typeof e.data === 'string' ? e.data : Buffer.from(e.data).toString()); } catch { return; }
     if (event.type === 'ping') return ws.send(JSON.stringify({ type: 'pong', event_id: event.ping_event?.event_id }));
     if (event.type === 'conversation_initiation_metadata') {
-      ws.send(JSON.stringify({ type: 'user_message', text: pagePrompt(spec, design, style) }));
+      ws.send(JSON.stringify({ type: 'user_message', text: pagePrompt(spec, design, style, extras) }));
       return ready();
     }
     if (event.type === 'agent_chat_response_part' && event.text_response_part?.type === 'delta' && event.text_response_part.text) {

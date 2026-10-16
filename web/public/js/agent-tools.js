@@ -26,7 +26,8 @@ const DESIGN_PARAM = {
   description:
     'A vivid 1-3 sentence brief for the page designer: purpose, mood, layout idea and what the user can tap, ' +
     'for example "A sunny beach-postcard hero with the trip date huge, a timeline of the day below, a big Book button." ' +
-    'Make each page in the session look different. Never for urgent pages.',
+    'For a new page, make it look different from the pages before it in the session; for a change, say only what changes ' +
+    '(the designer keeps the rest of the current look). Never for urgent pages.',
   required: false,
 };
 
@@ -100,8 +101,18 @@ export const TOOL_DEFS = [
   {
     name: 'revise_ui',
     description: 'Redraw the open generated page with a changed spec (same format as render_ui, each block like ' +
-      '{"type":"checklist","items":[{"text":"...","done":false}]}), after the user asked for a change.',
-    params: { spec_json: { type: 'string', description: 'The full changed UI spec as a JSON string', required: true }, design: DESIGN_PARAM },
+      '{"type":"checklist","items":[{"text":"...","done":false}]}), after the user asked for a change. ' +
+      'The result lists the versions of the page (v1, v2...) and how each looked.',
+    params: {
+      spec_json: { type: 'string', description: 'The full changed UI spec as a JSON string', required: true },
+      design: DESIGN_PARAM,
+      like_version: {
+        type: 'string',
+        description: 'Optional: the number of an earlier version the user points at ("the colours of the first one"); the designer ' +
+          'takes from it what the design brief names. Leave it out otherwise.',
+        required: false,
+      },
+    },
   },
   {
     name: 'inspect_page',
@@ -337,7 +348,7 @@ function createScreenHandlers(ui, learn) {
       return withSummary(spec.urgency === 'none' ? 'page shown; now ask if the user likes it and propose one or two changes' : 'first-aid page shown', spec);
     },
 
-    revise_ui({ spec_json, design } = {}) {
+    revise_ui({ spec_json, design, like_version } = {}) {
       const open = generated();
       if (!open) return 'error: no generated page is open';
       let spec = validateSpec(parseJson(spec_json));
@@ -345,11 +356,13 @@ function createScreenHandlers(ui, learn) {
       // A revise keeps the sources of the page it changes.
       const before = open.ctl.state?.().spec;
       spec = withSources(spec, before?.blocks.find((b) => b.type === 'sources')?.items);
-      ui.action('revise', { spec, ...designOf(design) });
+      const like = Number.parseInt(like_version, 10);
+      ui.action('revise', { spec, ...designOf(design), ...(like > 0 ? { like } : {}) });
       // Learn what the user asked to change, for the next page like it.
       learn.noteRevise(before, spec);
       offered = null;
-      return withSummary('page redrawn', spec);
+      const versions = open.ctl.history?.();
+      return `${withSummary('page redrawn', spec)}${versions ? ` ${versions}` : ''}`;
     },
 
     // Measured on the screen now (scenes/generated.js inspect); no picture is sent anywhere.

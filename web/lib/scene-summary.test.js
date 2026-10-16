@@ -74,5 +74,8 @@ test('open page note: a scene\'s summary, a generated page\'s summary, a bare na
   const spec = { title: 'Packing list', blocks: [{ type: 'checklist', items: [{ text: 'Passport', done: true }] }] };
   assert.match(openPageNote({ name: 'generated', ctl: { state: () => ({ spec }) } }), /^\[screen\] The generated page is open: "Packing list"\. .*Passport/);
   assert.equal(openPageNote({ name: 'secretary', ctl: {} }), '[screen] The secretary page is open.');
+  // A generated page names its versions too, so a new session can still refer to an earlier one.
+  const history = () => 'Versions of this page: v1: simple block page, accent blue; v2 (on screen now): simple block page, accent orange.';
+  assert.match(openPageNote({ name: 'generated', ctl: { state: () => ({ spec }), history } }), /Passport.* Versions of this page: v1: .*v2 \(on screen now\)/);
   assert.ok(openPageNote({ name: 'x', ctl: { summary: () => 'y'.repeat(900) } }).length <= SCENE_SUMMARY_MAX + 40);
 });

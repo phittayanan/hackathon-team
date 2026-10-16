@@ -379,11 +379,40 @@ test('live: a clean model page sends a silent note of how it looks; inspect_page
   await tool(page, 'render_ui', { spec_json: JSON.stringify(PACK), design: 'Beach packing list' });
   await expect(scene(page)).toHaveAttribute('data-view', 'html');
   const context = () => page.evaluate(() => window.__conv.context.join('\n'));
-  await expect.poll(context).toContain('[screen] The designed page looks like: Top to bottom: heading "จัดกระเป๋าไปทะเล"');
+  await expect.poll(context).toContain('[screen] The designed page (v1) looks like: Top to bottom: heading "จัดกระเป๋าไปทะเล"');
   const look = await tool(page, 'inspect_page', {});
-  expect(look).toMatch(/^Top to bottom: heading "จัดกระเป๋าไปทะเล", text "ของที่ต้องเอาไปเที่ยวทะเลวันเ…", list of 3 items\./);
+  expect(look).toMatch(/^Phone screen, page area \d+x\d+ px, portrait\. Top to bottom: heading "จัดกระเป๋าไปทะเล", text "ของที่ต้องเอาไปเที่ยวทะเลวันเ…", list of 3 items\./);
   expect(look).toMatch(/Background white/);
   expect(look).toMatch(/Text \d+ to 32 px\./);
   expect(look).toMatch(/Layout check: passed$/);
   expect(await page.evaluate(() => window.__conv.sent.join('\n'))).not.toContain('looks like');
+});
+
+test('live: a revise lists the earlier versions; the page writer gets the phone page area, the current look and the version named', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const calls = await stubPage(page, packPage(PACK.blocks[0].items.map((i) => i.text)));
+  await liveHome(page);
+  await tool(page, 'render_ui', { spec_json: JSON.stringify(PACK), design: 'Blue beach packing list' });
+  await expect(scene(page)).toHaveAttribute('data-view', 'html');
+  await expect.poll(() => page.evaluate(() => window.__conv.context.join('\n'))).toContain('[screen] The designed page (v1) looks like');
+  // On a laptop the app is a phone frame: the page area is phone sized, not the 1280 px window.
+  expect(calls[0].screen.width).toBeLessThan(400);
+  expect(calls[0].screen.height).toBeGreaterThan(calls[0].screen.width);
+  expect(calls[0].base).toBeNull();
+
+  const second = await tool(page, 'revise_ui', { spec_json: JSON.stringify({ ...PACK, accent: 'orange' }), design: 'Orange poster, same list' });
+  expect(second).toMatch(/Versions of this page: v1 from "Blue beach packing list": heading "จัดกระเป๋าไปทะเล".*; background white, accent none, colours #e8f4ff .*; v2 \(on screen now\) from "Orange poster, same list": designed page still being written\.$/);
+  await expect.poll(() => calls.length).toBe(2);
+  expect(calls[1].base).toMatchObject({ v: 1, brief: 'Blue beach packing list' });
+  expect(calls[1].base.palette).toContain('#e8f4ff');
+  expect(calls[1].reference).toBeNull();
+  await expect.poll(() => page.evaluate(() => window.__conv.context.join('\n'))).toContain('[screen] The designed page (v2) looks like');
+
+  // "Use the colours from the first one": the page writer gets v1 as the reference, v2 as the page being changed.
+  const third = await tool(page, 'revise_ui', { spec_json: JSON.stringify(PACK), design: 'The colours of v1, this layout', like_version: '1' });
+  expect(third).toMatch(/v3 \(on screen now\)/);
+  await expect.poll(() => calls.length).toBe(3);
+  expect(calls[2].base).toMatchObject({ v: 2 });
+  expect(calls[2].reference).toMatchObject({ v: 1, brief: 'Blue beach packing list' });
+  expect(calls[2].reference.look).toMatch(/colours #e8f4ff/);
 });

@@ -72,6 +72,12 @@ const quote = (s) => {
 const area = (r) => Math.max(0, r.width) * Math.max(0, r.height);
 
 export function describePage(boxes, viewport, fails = []) {
+  return describeLook(boxes, viewport, fails).text;
+}
+
+// The same look as facts too, for the page's version history (page-history.js):
+// { text, background, accent ('none' when there is none), sections: ['heading "…"', …] }.
+export function describeLook(boxes, viewport, fails = []) {
   const shown = boxes.map((b) => !isHidden(b, viewport));
   const kids = boxes.map(() => []);
   boxes.forEach((b, i) => {
@@ -139,5 +145,6 @@ export function describePage(boxes, viewport, fails = []) {
   const room = MAX_LOOK_CHARS - rest.length - 1;
   if (sections.length > room) sections = `${sections.slice(0, Math.max(0, room - 1)).trimEnd()}…`;
   const out = `${sections} ${rest}`;
-  return out.length > MAX_LOOK_CHARS ? `${out.slice(0, MAX_LOOK_CHARS - 1)}…` : out;
+  const text = out.length > MAX_LOOK_CHARS ? `${out.slice(0, MAX_LOOK_CHARS - 1)}…` : out;
+  return { text, background: colourName(back), accent: accent || 'none', sections: listed };
 }
