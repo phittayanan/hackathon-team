@@ -42,6 +42,10 @@
 .catalog-product img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: contain; margin-bottom: 16px; border-radius: 12px; }
 .catalog-price { font-size: 22px; font-weight: 700; }
 .catalog-store-link { display: inline-block; min-height: 44px; padding: 12px; color: #8b3a22; text-decoration: underline; }
+.scene-places { overflow-wrap: anywhere; padding-bottom: 28px; }
+.places-meta { margin: 0; font-size: 16px; font-weight: 600; }
+/* Google Maps attribution (Places policy): sans-serif 400, 12-16px, #5E5E5E, never translated. */
+.places-credit { margin: 8px 0 16px; font: 400 13px Roboto, Arial, sans-serif; color: #5e5e5e; }
 .catalog-product [aria-pressed="true"] { background: var(--ink); color: var(--card); }
 .product-search-form input:focus-visible { outline: 3px solid #bb482c; outline-offset: 3px; }
 .secretary-summary { color: var(--ink-2); line-height: 1.6; }

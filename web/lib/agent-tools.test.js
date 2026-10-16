@@ -58,6 +58,16 @@ test('search_videos opens only a validated YouTube results URL and reports its l
   assert.deepEqual(log.at(-1), ['open', 'video-search', { query: "Rubik's Cube" }]);
 });
 
+test('find_places opens the places page with a clean query and tells the agent to wait for results', async () => {
+  const { ui, log } = fakeUi();
+  const h = createToolHandlers(ui);
+  assert.match(await h.find_places({ query: ' ' }), /^error/);
+  assert.equal(log.length, 0);
+  const out = await h.find_places({ query: '  ร้าน   กาแฟ ' });
+  assert.match(out, /\[screen\] note/);
+  assert.deepEqual(log.at(-1), ['open', 'places', { query: 'ร้าน กาแฟ' }]);
+});
+
 test('open_scene returns the open scene\'s summary so the agent knows its facts', async () => {
   const ui = { current: () => ({ name: 'payment', ctl: { summary: () => 'Payment request to FreshMart Online, total ฿849.' } }), openScene: () => {} };
   assert.equal(await createToolHandlers(ui).open_scene({ scene: 'payment' }), 'opened payment: Payment request to FreshMart Online, total ฿849.');

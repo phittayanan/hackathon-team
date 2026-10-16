@@ -45,6 +45,17 @@ export const TOOL_DEFS = [
     },
   },
   {
+    name: 'find_places',
+    description:
+      'Find real places near the user on Google Maps: cafes, restaurants, pharmacies, hospitals, ATMs, petrol stations and the like. ' +
+      'Pass what to look for in the user\'s language, for example "ร้านกาแฟ" or "โรงพยาบาล". The page asks the browser for the user\'s position, ' +
+      'searches Google Maps and shows place cards (distance, rating, open now). The results arrive a few seconds later as a [screen] note: ' +
+      'wait for it, then name at most the top two. Never invent a place, distance, rating or opening time. You never see the user\'s coordinates.',
+    params: {
+      query: { type: 'string', description: 'What to find, 2 to 160 characters, without "near me"', required: true },
+    },
+  },
+  {
     name: 'secretary_action',
     description: 'Personal secretary DEMO with sample data only. today = today tasks and calendar; email = sample client email; add_tasks = import its two tasks once; draft = prepare editable reply proposing 14:30 (13:30 conflicts with team meeting); acknowledge or snooze = act on displayed notifications. Returns current sample data. No real mail or calendar changes. Sending requires the owner tapping the test-send button; no tool can send.',
     params: {
@@ -143,7 +154,7 @@ const parseJson = (text) => {
 const NO_BLOCKS = 'error: spec has no usable blocks; write each block as {"type":"<block type>", ...fields}, ' +
   'for example {"type":"checklist","items":[{"text":"...","done":false}]}, using only the fixed block types';
 
-const STEP_TOOLS = ['open_scene', 'scene_action', 'render_ui', 'revise_ui', 'keep_scene', 'search_videos'];
+const STEP_TOOLS = ['open_scene', 'scene_action', 'render_ui', 'revise_ui', 'keep_scene', 'search_videos', 'find_places'];
 const FAILED = /^(error|refused|no results|no page)/;
 const SCENE_TASKS = {
   shopping: 'groceries list from the weekly email',
@@ -153,6 +164,7 @@ const SCENE_TASKS = {
 };
 export function lastTask(name, params = {}) {
   if (name === 'search_videos') return `searched YouTube videos: ${String(params.query || '').slice(0, 80)}`;
+  if (name === 'find_places') return `searched Google Maps for: ${String(params.query || '').slice(0, 80)}`;
   if (name === 'open_scene' && params.scene === 'shopping' && parseJson(params.data_json)?.catalog === true) return 'product discovery through Shopify';
   if (name === 'open_scene') return SCENE_TASKS[params.scene] || null;
   if (name === 'render_ui') {
@@ -239,6 +251,12 @@ function createScreenHandlers(ui, learn) {
       if (!result) return 'error: provide a video search query of at least 2 characters';
       await ui.openScene('video-search', { query: result.query });
       return `opened YouTube search results for "${result.query}"; tell the user to choose a video from the results; no individual video was fetched or verified`;
+    },
+    async find_places({ query } = {}) {
+      const clean = typeof query === 'string' ? query.replace(/\s+/g, ' ').trim().slice(0, 160) : '';
+      if (clean.length < 2) return 'error: provide what to find, at least 2 characters';
+      await ui.openScene('places', { query: clean });
+      return `opened the Google Maps search for "${clean}"; say you are looking now; the places arrive as a [screen] note; do not name any place before it`;
     },
     secretary_action({ action, minutes = '1' } = {}) {
       if (!SECRETARY_ACTIONS.includes(action) || (action === 'snooze' && !['1', '5'].includes(minutes))) return 'error: invalid secretary action';

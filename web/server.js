@@ -51,6 +51,7 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/api/route' && req.method === 'POST') return send(res, 200, await app.route(await readJson(req)));
     if (url.pathname === '/api/tts' && req.method === 'POST') return send(res, 200, await app.tts(h, await readJson(req)), 'audio/mpeg');
     if (url.pathname === '/api/catalog' && req.method === 'POST') return send(res, 200, await app.catalog(h, await readJson(req)));
+    if (url.pathname === '/api/places' && req.method === 'POST') return send(res, 200, await app.places(h, await readJson(req)));
     if (url.pathname === '/api/image' && req.method === 'POST') return send(res, 200, await app.image(h, await readJson(req)));
     if (url.pathname === '/api/page' && req.method === 'POST') {
       const body = await readJson(req);
