@@ -5,7 +5,7 @@
 //   POST /api/tts             { text }          -> audio/mpeg from ElevenLabs (if ELEVENLABS_API_KEY)
 //   POST /api/image           { prompt, scene } -> { url } or { error }: a picture for a generated page
 //   GET  /api/image/<key>.png                   -> a cached picture (local only)
-//   POST /api/page            { spec, design }  -> text/plain stream of the page writer agent's HTML (ElevenLabs)
+//   POST /api/page            { spec, design, style } -> text/plain stream of the page writer agent's HTML (ElevenLabs)
 //   POST /api/log             { events }        -> appends browser events to the run log (web/logs/*.jsonl)
 // The always-on agent loop runs in the page (public/js/agent-link.js), not here.
 import { createServer } from 'node:http';

@@ -5,6 +5,7 @@ import { validateSpec } from './genui.js';
 import { plan as screenPlan } from './plan.js';
 import { remember as keepFact, forgetMemory, MEMORY_KEYS } from './memory.js';
 import * as learner from './learn.js';
+import { resetStyle } from './style.js';
 
 export const PROACTIVE_SCENES = ['shopping', 'payment', 'flight', 'training'];
 const SECRETARY_ACTIONS = ['today', 'email', 'add_tasks', 'draft', 'acknowledge', 'snooze'];
@@ -165,7 +166,7 @@ export function createToolHandlers(ui) {
   const handlers = createScreenHandlers(ui, learn);
   handlers.remember = ({ key, value } = {}) => {
     if (key === 'forget_all') {
-      (ui.forget || (() => { forgetMemory(); learn.forgetLearned(); }))();
+      (ui.forget || (() => { forgetMemory(); learn.forgetLearned(); resetStyle(); }))();
       return 'forgot everything about the user on this phone; say so in one short sentence';
     }
     return remember(key, value) ? `remembered ${key}; do not mention it` : `error: key must be one of ${MEMORY_KEYS.join(', ')}`;

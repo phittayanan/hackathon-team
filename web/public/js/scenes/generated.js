@@ -9,6 +9,7 @@
 import { T } from '../timing.js';
 import { apiFetch } from '../api.js';
 import { sanitizePage, sanitizePartial, pageOk } from '../page-sanitize.js';
+import { applyStyle, styleText } from '../style.js';
 
 // The browser waits a little longer than the server's own 12 s limit (lib/page-model.js).
 const PAGE_WAIT_MS = 14_000;
@@ -264,6 +265,8 @@ export default function mountGenerated(el, data, agent) {
     el.dataset.version = String(version);
     el.dataset.stage = stage;
     el.dataset.view = view;
+    // The user's own design system (style.js) on the root: the block page follows it.
+    applyStyle(el);
     el.replaceChildren();
     const badge = h('p', `g-badge${urgent ? ' g-badge-urgent' : ''}`, urgent ? 'First aid' : fromSaved ? 'Saved scene' : 'Generated for you');
     badge.dataset.testid = 'g-badge';
@@ -324,7 +327,7 @@ export default function mountGenerated(el, data, agent) {
       const res = await apiFetch('/api/page', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ spec, design }),
+        body: JSON.stringify({ spec, design, style: styleText() }),
         signal: stop.signal,
       });
       if (!res.ok || !res.body) throw new Error(`page http ${res.status}`);

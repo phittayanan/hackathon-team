@@ -58,7 +58,8 @@ export const SYSTEM_PROMPT = [
 ].join('\n');
 
 // The user message: the brief plus the spec's content (title and blocks; the app draws the choice chips itself).
-export function pagePrompt(spec, design) {
+// style: the user's design system as one line (public/js/style.js styleText), after the brief.
+export function pagePrompt(spec, design, style) {
   const content = {
     title: spec.title,
     subtitle: spec.subtitle || undefined,
@@ -67,6 +68,7 @@ export function pagePrompt(spec, design) {
   };
   return [
     `Design brief: ${String(design || 'A clear, friendly page for this content.').slice(0, 600)}`,
+    ...(style ? [`User's design system: ${String(style).slice(0, 200)}`] : []),
     'Content (JSON; show all of it, as real UI, not as JSON). A "button" block becomes a <button data-action>.',
     JSON.stringify(content),
   ].join('\n');
@@ -83,7 +85,7 @@ export class PageModelError extends Error {
 // so the caller tries the next account), then returns an async iterator of text pieces.
 // Text before the first "<" (a ```html fence) is dropped. The signal stops it (time limit, visitor left).
 // env: ELEVENLABS_API_KEY and ELEVENLABS_AGENT_ID (the page writer's id) of one account.
-export async function streamPage({ spec, design }, env = process.env, { fetchImpl = fetch, WebSocketImpl = globalThis.WebSocket, signal } = {}) {
+export async function streamPage({ spec, design, style }, env = process.env, { fetchImpl = fetch, WebSocketImpl = globalThis.WebSocket, signal } = {}) {
   if (!WebSocketImpl) throw new PageModelError('no global WebSocket (Node 22 or later)');
   const url = await signedUrl(env, fetchImpl, signal);
   signal?.throwIfAborted();
@@ -116,7 +118,7 @@ export async function streamPage({ spec, design }, env = process.env, { fetchImp
     try { event = JSON.parse(typeof e.data === 'string' ? e.data : Buffer.from(e.data).toString()); } catch { return; }
     if (event.type === 'ping') return ws.send(JSON.stringify({ type: 'pong', event_id: event.ping_event?.event_id }));
     if (event.type === 'conversation_initiation_metadata') {
-      ws.send(JSON.stringify({ type: 'user_message', text: pagePrompt(spec, design) }));
+      ws.send(JSON.stringify({ type: 'user_message', text: pagePrompt(spec, design, style) }));
       return ready();
     }
     if (event.type === 'agent_chat_response_part' && event.text_response_part?.type === 'delta' && event.text_response_part.text) {

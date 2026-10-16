@@ -1,6 +1,7 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { learn, learned, learnedText, forgetLearnedKey, reviseLessons, noteRevise, noteKeep, noteIgnored, noteFeed, agentOpened, proactiveWatch, forgetOnRequest, MAX_LEARNED } from '../public/js/learn.js';
+import { learn, learned, learnedText, forgetLearnedKey, reviseLessons, noteRevise, noteKeep, noteIgnored, noteFeed, agentOpened, proactiveWatch, forgetOnRequest, MAX_LEARNED, styleChanges, noteStyle, noteHeard, heardWish } from '../public/js/learn.js';
+import { styleProfile, setStyle, STYLE_DEFAULT } from '../public/js/style.js';
 import { createToolHandlers } from '../public/js/agent-tools.js';
 import { sessionVariables } from '../public/js/memory.js';
 
@@ -93,4 +94,62 @@ test('forgetLearnedKey forgets one preference and keeps the rest', () => {
   assert.deepEqual(learned().map((l) => l.key), ['todo:progress']);
   assert.equal(forgetLearnedKey('todo:due'), false);
   assert.equal(learnedText(), 'todo pages: add a progress bar');
+});
+
+const chartPage = (extra = []) => todo([{ type: 'chart', bars: [{ label: 'a', value: 1 }] }, ...extra]);
+const plain = todo([{ type: 'text', text: 'hi' }]);
+const wish = (text, profile = STYLE_DEFAULT) => styleChanges(plain, plain, text, profile);
+
+test('revise wishes become style changes, in Thai and English', () => {
+  assert.deepEqual(wish('ขอตัวหนังสือใหญ่ขึ้น'), [{ key: 'size', value: 'large' }]);
+  assert.deepEqual(wish('make the text bigger', { ...STYLE_DEFAULT, size: 'large' }), [{ key: 'size', value: 'xlarge' }]);
+  assert.deepEqual(wish('bigger please', { ...STYLE_DEFAULT, size: 'xlarge' }), []); // already the largest
+  assert.deepEqual(wish('ตัวใหญ่ไป', { ...STYLE_DEFAULT, size: 'large' }), [{ key: 'size', value: 'normal' }]);
+  assert.deepEqual(wish('เล็กลงหน่อย', { ...STYLE_DEFAULT, size: 'large' }), [{ key: 'size', value: 'normal' }]);
+  assert.deepEqual(wish('text is too small'), [{ key: 'size', value: 'large' }]);
+  assert.deepEqual(wish('ขอโล่งๆ'), [{ key: 'density', value: 'airy' }]);
+  assert.deepEqual(wish('simpler'), [{ key: 'density', value: 'airy' }]);
+  assert.deepEqual(wish('แน่นกว่านี้ได้'), [{ key: 'density', value: 'compact' }]);
+  assert.deepEqual(wish('more detail'), [{ key: 'density', value: 'compact' }]);
+  assert.deepEqual(wish('อ่านยาก'), [{ key: 'contrast', value: 'high' }]);
+  assert.deepEqual(wish('more contrast'), [{ key: 'contrast', value: 'high' }]);
+  assert.deepEqual(wish('เปลี่ยนเป็นสีเขียวอมฟ้า'), [{ key: 'accent', value: 'teal' }]);
+  assert.deepEqual(wish('make it blue'), [{ key: 'accent', value: 'blue' }]);
+  assert.deepEqual(wish('สีชมพู'), [{ key: 'accent', value: 'rose' }]);
+  assert.deepEqual(wish('bigger and teal'), [{ key: 'size', value: 'large' }, { key: 'accent', value: 'teal' }]);
+});
+
+test('words that only look like style wishes change nothing', () => {
+  assert.deepEqual(wish('แก้เล็กน้อย เพิ่มงานแรก'), []); // "a little", "first"
+  assert.deepEqual(wish('เพิ่มค่าไฟฟ้า'), []); // electricity bill
+  assert.deepEqual(wish('add a due date'), []);
+  assert.deepEqual(wish(''), []);
+});
+
+test('a chart removed by a revise sets charts: avoid; one added back sets ok', () => {
+  assert.deepEqual(styleChanges(chartPage(), plain, ''), [{ key: 'charts', value: 'avoid' }]);
+  assert.deepEqual(styleChanges(plain, chartPage(), '', { ...STYLE_DEFAULT, charts: 'avoid' }), [{ key: 'charts', value: 'ok' }]);
+  assert.deepEqual(styleChanges(chartPage(), chartPage(), ''), []);
+});
+
+test('noteStyle saves the profile and adds one learned line per change', () => {
+  noteStyle(chartPage(), plain, 'ใหญ่ขึ้น สีเขียวอมฟ้า');
+  assert.deepEqual(styleProfile(), { ...STYLE_DEFAULT, size: 'large', accent: 'teal', charts: 'avoid' });
+  assert.match(learnedText(), /style: large text/);
+  assert.match(learnedText(), /style: teal accent/);
+  assert.match(learnedText(), /style: avoid charts/);
+  // The same wish again on the largest step: nothing new.
+  setStyle('size', 'xlarge');
+  assert.deepEqual(noteStyle(plain, plain, 'bigger'), []);
+});
+
+test('noteRevise reads the last thing heard, within a minute', () => {
+  noteHeard('bigger text please', 1000);
+  assert.equal(heardWish(30000), 'bigger text please');
+  assert.equal(heardWish(62000), '');
+  noteHeard('ขอใหญ่ขึ้น');
+  noteRevise(plain, plain);
+  assert.equal(styleProfile().size, 'large');
+  assert.equal(forgetOnRequest('?forget=1'), true);
+  assert.deepEqual(styleProfile(), STYLE_DEFAULT);
 });

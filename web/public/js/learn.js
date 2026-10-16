@@ -3,6 +3,8 @@
 // user passed over, and updates the agent spoke first about that the user dismissed or used.
 // The live agent gets them as {{learned}} at session start and builds the next page with them.
 // Capped (newest 6), each line short; `?forget=1` or the remember tool's forget_all resets.
+import { styleProfile, setStyle, resetStyle, STYLE_FIELDS, STYLE_WORDS } from './style.js';
+
 const KEY = 'agentos.learned';
 export const MAX_LEARNED = 6;
 const MAX_LEN = 90;
@@ -85,8 +87,65 @@ export function reviseLessons(before, after) {
   return out;
 }
 
-export function noteRevise(before, after) {
-  return reviseLessons(before, after).map(({ key, text }) => learn(key, text));
+// What the user last said or typed, so a revise can read the wish behind it (the agent's revise_ui
+// call carries only the new spec). A wish older than a minute is not this revise's.
+let heard = { text: '', at: 0 };
+export const noteHeard = (text, now = Date.now()) => { heard = { text: String(text || '').slice(0, 300), at: now }; };
+export const heardWish = (now = Date.now()) => (now - heard.at <= 60000 ? heard.text : '');
+
+// Plain revise wishes -> the user's design system (style.js). Thai and English words; "too big" is
+// read before "big". Size and density step one level; colour and contrast are set.
+const WISHES = [
+  ['size', -1, /ใหญ่ไป|ใหญ่เกิน|too (big|large)/i],
+  ['size', 1, /เล็กไป|เล็กเกิน|too small|tiny/i],
+  ['size', 1, /ใหญ่|bigger|larger|enlarge/i],
+  ['size', -1, /เล็ก(?!น้อย)|smaller/i], // "เล็กน้อย" is "a little", not "small"
+  ['density', -1, /โล่ง|ไม่รก|รกไป|รกเกิน|น้อยลง|simpler|simple|less (on|stuff|clutter)|cluttered/i], // not a bare "รก": "แรก"
+  ['density', 1, /แน่น|ละเอียด|more detail|compact/i],
+];
+const CONTRAST_WORDS = /ชัด|อ่านยาก|contrast|hard to read/i;
+// Teal before blue and green: "เขียวอมฟ้า" holds both. Blue needs "สีฟ้า": a bare "ฟ้า" is in "ไฟฟ้า".
+const ACCENT_WORDS = [
+  ['teal', /teal|turquoise|เขียวอมฟ้า/i],
+  ['lavender', /lavender|purple|violet|ม่วง/i],
+  ['rose', /rose|pink|ชมพู/i],
+  ['blue', /blue|น้ำเงิน|สีฟ้า/i],
+  ['green', /green|เขียว/i],
+];
+
+const step = (key, value, by) => {
+  const values = STYLE_FIELDS[key].values;
+  return values[Math.max(0, Math.min(values.length - 1, values.indexOf(value) + by))];
+};
+
+// Style changes a revise asks for: [{ key, value }], only those that change the profile.
+export function styleChanges(before, after, wish = '', profile = styleProfile()) {
+  const next = { ...profile };
+  const text = String(wish || '');
+  for (const key of ['size', 'density']) {
+    const hit = WISHES.find(([k, , re]) => k === key && re.test(text));
+    if (hit) next[key] = step(key, profile[key], hit[1]);
+  }
+  const accent = ACCENT_WORDS.find(([, re]) => re.test(text));
+  if (accent) next.accent = accent[0];
+  if (CONTRAST_WORDS.test(text)) next.contrast = 'high';
+  if (before && after) {
+    if (types(before).has('chart') && !types(after).has('chart')) next.charts = 'avoid';
+    else if (!types(before).has('chart') && types(after).has('chart')) next.charts = 'ok';
+  }
+  return Object.keys(STYLE_FIELDS).filter((k) => next[k] !== profile[k]).map((k) => ({ key: k, value: next[k] }));
+}
+
+// Apply them to the profile, each with one learned line ("style: large text") for {{learned}}.
+export function noteStyle(before, after, wish = heardWish()) {
+  return styleChanges(before, after, wish).map(({ key, value }) => {
+    setStyle(key, value);
+    return learn(`style:${key}`, `style: ${STYLE_WORDS[key][value]}`);
+  });
+}
+
+export function noteRevise(before, after, wish = heardWish()) {
+  return [...reviseLessons(before, after).map(({ key, text }) => learn(key, text)), ...noteStyle(before, after, wish)];
 }
 
 export const noteKeep = (spec) => learn(`${kindOf(spec)}:kept`, `liked and kept the ${pageName(spec)} page layout`);
@@ -133,6 +192,7 @@ export const proactiveWatch = {
 export function forgetOnRequest(search = globalThis.location?.search || '') {
   if (!new URLSearchParams(search).has('forget')) return false;
   forgetLearned();
+  resetStyle();
   try {
     globalThis.localStorage?.removeItem('agentos.memory');
   } catch { /* nothing to forget */ }

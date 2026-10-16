@@ -13,7 +13,7 @@ import { live, checkLive, prepareLive, startLive, setMic, sendText, sendContext,
 import { T, TEST, PRESENTER, wait } from './timing.js';
 import { plan, watchScenes } from './plan.js';
 import { hasMemory } from './memory.js';
-import { noteFeed, proactiveWatch, forgetOnRequest } from './learn.js';
+import { noteFeed, noteHeard, noteRevise, proactiveWatch, forgetOnRequest } from './learn.js';
 import { createSecretary } from './secretary.js';
 import { setupSecretaryDemo } from './secretary-demo.js';
 import { initMascot } from './mascot.js';
@@ -156,6 +156,8 @@ const toolUi = {
 export async function handleUserText(text) {
   text = text.trim();
   if (!text) return;
+  // A revise reads the wish behind it (bigger text, a colour) into the user's style.
+  noteHeard(text);
   // Live agent: it hears the text and answers through its tools.
   if (live.connected) {
     showSubtitle(`“${text}”`, 2400);
@@ -183,6 +185,7 @@ export async function handleUserText(text) {
   document.body.dataset.via = res.via || '';
 
   if (res.action) {
+    if (res.action === 'revise' && res.spec) noteRevise(open?.ctl.state?.().spec, res.spec, text);
     const talking = res.say ? speak({ line: res.line, text: res.say }) : Promise.resolve();
     open?.ctl.onAction?.(res.action, res, talking);
     await talking;
