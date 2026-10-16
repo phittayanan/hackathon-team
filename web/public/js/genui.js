@@ -106,6 +106,68 @@ export function validateSpec(spec) {
   };
 }
 
+// ---------- Page summary for the live agent ----------
+
+export const SUMMARY_MAX = 600;
+const doneShare = (spec) => {
+  const items = spec.blocks.filter((b) => b.type === 'checklist').flatMap((b) => b.items);
+  return items.length ? Math.round((items.filter((i) => i.done).length / items.length) * 100) : 0;
+};
+const numbered = (items) => items.map((t, n) => `${n + 1}. ${t}`).join('; ');
+
+function blockSummary(b, spec) {
+  switch (b.type) {
+    case 'text': return `Text: ${b.text}`;
+    case 'stat': return `Stat: ${b.label} ${b.value}`;
+    case 'progress': return `Progress: ${b.label} ${b.value === 'auto' ? doneShare(spec) : b.value}%`;
+    case 'checklist':
+      return `Checklist: ${numbered(b.items.map((i) => {
+        const notes = [i.done ? 'done' : 'not done', i.due && `due ${i.due}`, i.tag && `tag ${i.tag}`].filter(Boolean);
+        return `${i.text} (${notes.join(', ')})`;
+      }))}`;
+    case 'list': return `List: ${numbered(b.items)}`;
+    case 'card': return `Card "${b.title}": ${b.text}`;
+    case 'chart': return `Chart: ${b.bars.map((x) => `${x.label} ${x.value}`).join(', ')}`;
+    case 'field': return `Field: ${b.label}`;
+    case 'button': return `Button: ${b.label}`;
+    case 'steps': return `Steps: ${numbered(b.items)}`;
+    case 'call': return `Call button: ${b.label} (${b.number})`;
+    case 'image': return `Picture${b.caption ? `: ${b.caption}` : ''}`;
+    case 'sources': return `Sources: ${b.items.map((i) => i.title).join(', ')}`;
+  }
+  return '';
+}
+
+// What a validated spec shows, as short plain text for the live agent: the title, then each block
+// with its items, done state and numbers. At most SUMMARY_MAX characters, cut with an ellipsis.
+export function pageSummary(spec) {
+  if (!spec?.blocks) return '';
+  const head = `"${spec.title}"${spec.subtitle ? ` (${spec.subtitle})` : ''}`;
+  const text = [head, ...spec.blocks.map((b) => blockSummary(b, spec)).filter(Boolean)].join('. ');
+  return text.length > SUMMARY_MAX ? `${text.slice(0, SUMMARY_MAX - 1)}…` : text;
+}
+
+// The silent update the live agent gets when the user changes the open page by hand.
+export const changeNote = (change, spec) => `[screen] The user changed the page: ${change}. Page now shows: ${pageSummary(spec)}`;
+
+// A toggle on a model-written page: set done on the checklist item whose text the toggle shows
+// (the longest match wins). Returns the new spec and that item, or the same spec and null.
+export function markDone(spec, shownText, done) {
+  const norm = (t) => String(t || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const shown = norm(shownText);
+  let best = null;
+  spec.blocks.forEach((b, bi) => {
+    if (b.type !== 'checklist') return;
+    b.items.forEach((i, ii) => {
+      const t = norm(i.text);
+      if (t && shown.includes(t) && (!best || t.length > best.len)) best = { bi, ii, len: t.length };
+    });
+  });
+  if (!best) return { spec, item: null };
+  const blocks = spec.blocks.map((b, bi) => (bi !== best.bi ? b : { ...b, items: b.items.map((i, ii) => (ii === best.ii ? { ...i, done } : i)) }));
+  return { spec: { ...spec, blocks }, item: blocks[best.bi].items[best.ii] };
+}
+
 // ---------- No-key fallback: one canned todo spec and keyword revisions ----------
 
 const DUE = ['Today', 'Today', 'Tomorrow', 'Fri', 'Fri'];
