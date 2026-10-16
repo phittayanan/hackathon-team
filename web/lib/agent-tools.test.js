@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createToolHandlers, TOOL_DEFS, keptPagesNote } from '../public/js/agent-tools.js';
-import { cannedTodo, cannedFirstAid, validateSpec, pageSummary, SUMMARY_MAX } from '../public/js/genui.js';
+import { cannedTodo, cannedFirstAid, validateSpec, pageSummary, SUMMARY_MAX, BLOCK_TYPES } from '../public/js/genui.js';
 
 function fakeUi(open = null) {
   const log = [];
@@ -79,12 +79,36 @@ test('render_ui and revise_ui: the no-usable-blocks error names the block shape 
   const bad = await h.render_ui({ spec_json: '{"blocks":[{"type":"script"}]}' });
   await h.render_ui({ spec_json: JSON.stringify(cannedTodo()) });
   for (const err of [bad, h.revise_ui({ spec_json: '{"blocks":[]}' })]) {
-    assert.match(err, /^error: spec has no usable blocks/);
+    assert.match(err, /^error: no usable blocks; rejected types: .+; allowed: text, stat, .+; example: /);
     assert.match(err, /\{"type":"checklist","items":\[\{"text":"\.\.\.","done":false\}\]\}/);
     assert.ok(!err.includes('\n'));
   }
   const defs = Object.fromEntries(TOOL_DEFS.map((t) => [t.name, t.description]));
   for (const name of ['render_ui', 'revise_ui']) assert.match(defs[name], /\{"type":"checklist","items":\[\{"text":"\.\.\.","done":false\}\]\}/, name);
+});
+
+test('render_ui and revise_ui: bad JSON and rejected blocks get different errors', async () => {
+  const h = createToolHandlers(fakeUi().ui);
+  const EXAMPLE = '; example: {"type":"checklist","items":[{"text":"...","done":false}]}';
+  const ALLOWED = `; allowed: ${BLOCK_TYPES.join(', ')}`;
+  // Bad JSON: the parser message, at most 80 characters, and nothing about blocks.
+  const badJson = await h.render_ui({ spec_json: '{"blocks":[{"type":"checklist",' });
+  const m = badJson.match(/^error: spec_json is not valid JSON \((.*)\)$/);
+  assert.ok(m, badJson);
+  assert.ok(m[1].length > 0 && m[1].length <= 80, m[1]);
+  assert.ok(!badJson.includes('blocks;'));
+  // Rejected blocks: the types or shapes seen (at most 5, no repeats), the allowed types and the example.
+  const blocks = [{ type: 'script' }, { type: 'html', html: '<b>' }, { type: 'script' }, { title: 'x', body: 'y' }, 'just text', { type: 'call', number: '123' }, { type: 'table' }, { type: 'video' }];
+  assert.equal(await h.render_ui({ spec_json: JSON.stringify({ blocks }) }),
+    `error: no usable blocks; rejected types: script, html, {title,body} without "type", string, call (fields not usable)${ALLOWED}${EXAMPLE}`);
+  assert.equal(await h.render_ui({ spec_json: '{"title":"x"}' }), `error: no usable blocks; rejected types: no "blocks" array${ALLOWED}${EXAMPLE}`);
+  assert.equal(await h.render_ui({ spec_json: '[1]' }), `error: no usable blocks; rejected types: spec is array, not an object${ALLOWED}${EXAMPLE}`);
+  // revise_ui: same two errors once a page is open; its "no page open" error is unchanged.
+  assert.equal(h.revise_ui({ spec_json: '{}' }), 'error: no generated page is open');
+  await h.render_ui({ spec_json: JSON.stringify(cannedTodo()) });
+  assert.match(h.revise_ui({ spec_json: 'not json' }), /^error: spec_json is not valid JSON \(.{1,80}\)$/);
+  assert.equal(h.revise_ui({ spec_json: '{"blocks":[{"type":"table"}]}' }), `error: no usable blocks; rejected types: table${ALLOWED}${EXAMPLE}`);
+  for (const err of [badJson, h.revise_ui({ spec_json: '{"blocks":[]}' })]) assert.ok(!err.includes('\n'));
 });
 
 test('mark_urgent and keep_scene: first-aid pages are never kept', async () => {

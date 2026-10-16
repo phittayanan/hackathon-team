@@ -115,6 +115,35 @@ export function validateSpec(spec) {
   };
 }
 
+// The error render_ui and revise_ui return when validateSpec gives null, split so the agent can fix its next
+// call: bad JSON (with the parser message), or JSON whose blocks are all rejected (the types or shapes seen).
+export const BLOCK_EXAMPLE = '{"type":"checklist","items":[{"text":"...","done":false}]}';
+const shapeOf = (v) => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v);
+function rejectedShape(b) {
+  b = unkey(b);
+  if (!isObj(b)) return shapeOf(b);
+  if (typeof b.type !== 'string') return `{${Object.keys(b).slice(0, 4).join(',')}} without "type"`;
+  const type = b.type.slice(0, 24);
+  return BLOCK_TYPES.includes(type) ? `${type} (fields not usable)` : type;
+}
+export function specError(specJson) {
+  let spec = specJson;
+  if (typeof specJson === 'string' && specJson !== '') {
+    try {
+      spec = JSON.parse(specJson);
+    } catch (e) {
+      return `error: spec_json is not valid JSON (${String(e?.message || e).slice(0, 80)})`;
+    }
+  }
+  let seen;
+  if (spec == null || spec === '') seen = ['no spec'];
+  else if (!isObj(spec)) seen = [`spec is ${shapeOf(spec)}, not an object`];
+  else if (!Array.isArray(spec.blocks)) seen = [spec.blocks === undefined ? 'no "blocks" array' : `"blocks" is ${shapeOf(spec.blocks)}, not an array`];
+  else if (!spec.blocks.length) seen = ['none ("blocks" is empty)'];
+  else seen = [...new Set(spec.blocks.slice(0, 14).map(rejectedShape))].slice(0, 5);
+  return `error: no usable blocks; rejected types: ${seen.join(', ')}; allowed: ${BLOCK_TYPES.join(', ')}; example: ${BLOCK_EXAMPLE}`;
+}
+
 // ---------- Page summary for the live agent ----------
 
 export const SUMMARY_MAX = 600;

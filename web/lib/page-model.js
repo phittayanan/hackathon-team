@@ -11,11 +11,14 @@
 // The key stays on the server. What the agent writes is sanitized in the browser before it is shown
 // (public/js/page-sanitize.js), so the answer is passed on as plain text.
 import { signedUrl } from './live-session.js';
+import { ACCOUNT_BLOCKED } from '../public/js/account-blocked.js';
 
 export const PAGE_TIMEOUT_MS = 12_000;
 // Same accounts as the live agent (lib/accounts.js): ready when there is an ElevenLabs key.
 export const pageReady = (accounts) => accounts.ready();
-const OUT_OF_CREDIT = /quota|credit|insufficient|exceeded/i;
+// A blocked workspace (account_restricted) counts as out of credit too.
+const CREDIT_WORDS = /quota|credit|insufficient|exceeded/i;
+const OUT_OF_CREDIT = { test: (text) => CREDIT_WORDS.test(text) || ACCOUNT_BLOCKED.test(text) };
 
 // Pictures in web/public/img the page may use by path.
 export const PICTURES = {

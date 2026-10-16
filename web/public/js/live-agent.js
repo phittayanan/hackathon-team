@@ -11,6 +11,7 @@ import { apiFetch, goOffline, onOffline, micBlocked } from './api.js';
 import { sessionVariables } from './memory.js';
 import { noteHeard } from './learn.js';
 import { MAX_SESSION_SECONDS, IDLE_END_SECONDS } from './session-limits.js';
+import { ACCOUNT_BLOCKED } from './account-blocked.js';
 
 // @elevenlabs/client, pinned. jsDelivr's +esm build is one self-contained ES module.
 const SDK_URL = 'https://cdn.jsdelivr.net/npm/@elevenlabs/client@1.26.0/+esm';
@@ -75,8 +76,10 @@ export async function checkLive(healthPromise = apiFetch('/api/health').then((r)
   return live.available;
 }
 
-// ElevenLabs closes the conversation with a quota message when the credit runs out.
-const OUT_OF_CREDIT = /quota|credit|insufficient/i;
+// ElevenLabs closes the conversation with a quota message when the credit runs out, or with
+// account_restricted when the workspace is blocked (account-blocked.js); both use the next account.
+const CREDIT_WORDS = /quota|credit|insufficient/i;
+const OUT_OF_CREDIT = { test: (text) => CREDIT_WORDS.test(text) || ACCOUNT_BLOCKED.test(text) };
 
 // The live call was cut for credit. The server may have another teammate's account
 // (ELEVENLABS_API_KEYS): tell it which one ran out and fetch the next signed URL ahead. The page

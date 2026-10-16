@@ -91,6 +91,8 @@ test('streamPage: no text parts -> the whole agent_response is the page', async 
 test('streamPage: out of credit (signed URL or a quota close before the start) is marked outOfCredit', async () => {
   await assert.rejects(streamPage({ spec: SPEC }, ENV, { fetchImpl: fakeFetch({ empty: ['k'] }).fetchImpl, WebSocketImpl: fakeSocket().WebSocketImpl }), (e) => e.outOfCredit === true);
   await assert.rejects(streamPage({ spec: SPEC }, ENV, { fetchImpl: fakeFetch().fetchImpl, WebSocketImpl: fakeSocket({ closeBefore: 'quota exceeded' }).WebSocketImpl }), (e) => e.outOfCredit === true);
+  const restricted = '[account_restricted] This workspace is restricted from the free tier. Upgrade your plan to start a new conversation.';
+  await assert.rejects(streamPage({ spec: SPEC }, ENV, { fetchImpl: fakeFetch().fetchImpl, WebSocketImpl: fakeSocket({ closeBefore: restricted }).WebSocketImpl }), (e) => e.outOfCredit === true);
   await assert.rejects(streamPage({ spec: SPEC }, ENV, { fetchImpl: fakeFetch().fetchImpl, WebSocketImpl: fakeSocket({ closeBefore: 'bye' }).WebSocketImpl }), (e) => !e.outOfCredit && /closed 1008/.test(e.message));
 });
 
