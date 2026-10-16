@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createToolHandlers, TOOL_DEFS, keptPagesNote } from '../public/js/agent-tools.js';
-import { cannedTodo, cannedFirstAid, validateSpec } from '../public/js/genui.js';
+import { cannedTodo, cannedFirstAid, validateSpec, pageSummary, SUMMARY_MAX } from '../public/js/genui.js';
 
 function fakeUi(open = null) {
   const log = [];
@@ -93,4 +93,55 @@ test('kept pages: the note lists name, words and reference; render_ui reopens on
   assert.match(h.keep_scene(), /^kept/);
   assert.equal(told.length, 1);
   assert.match(told[0], /\{"saved":"todo"\}/);
+});
+
+test('pageSummary: title, each block with its items, done state and numbers', () => {
+  const spec = validateSpec({
+    title: 'Trip prep',
+    subtitle: 'Sat 17 Oct',
+    blocks: [
+      { type: 'progress', label: 'Done', value: 'auto' },
+      { type: 'checklist', items: [{ text: 'Passport', done: true }, { text: 'Charger', due: 'Fri', tag: 'High' }] },
+      { type: 'stat', label: 'Budget', value: '1,500 THB' },
+      { type: 'chart', bars: [{ label: 'Mon', value: 3 }, { label: 'Tue', value: 5 }] },
+      { type: 'card', title: 'Hotel', text: 'Check in at 14:00' },
+      { type: 'button', label: 'Book' },
+      { type: 'divider' },
+    ],
+  });
+  assert.equal(
+    pageSummary(spec),
+    '"Trip prep" (Sat 17 Oct). Progress: Done 50%. ' +
+      'Checklist: 1. Passport (done); 2. Charger (not done, due Fri, tag High). ' +
+      'Stat: Budget 1,500 THB. Chart: Mon 3, Tue 5. Card "Hotel": Check in at 14:00. Button: Book',
+  );
+  assert.equal(pageSummary(null), '');
+});
+
+test('pageSummary: a long page is cut with an ellipsis', () => {
+  const spec = validateSpec({ title: 'Long', blocks: Array.from({ length: 6 }, () => ({ type: 'text', text: 'x'.repeat(300) })) });
+  const out = pageSummary(spec);
+  assert.equal(out.length, SUMMARY_MAX);
+  assert.ok(out.endsWith('…'));
+});
+
+test('render_ui, revise_ui and a reopened kept page say what the page shows', async () => {
+  const todo = validateSpec(cannedTodo());
+  const saved = { todo: { kind: 'todo', name: 'To-do list', match: ['todo'], spec: todo } };
+  const { ui } = fakeUi();
+  const h = createToolHandlers({ ...ui, saved: () => saved });
+
+  const shown = await h.render_ui({ spec_json: JSON.stringify(todo) });
+  assert.equal(shown, `page shown; now ask if the user likes it and propose one or two changes. Page now shows: ${pageSummary(todo)}`);
+
+  const changed = { ...todo, title: 'Shorter list', blocks: todo.blocks.filter((b) => b.type === 'checklist') };
+  const redrawn = h.revise_ui({ spec_json: JSON.stringify(changed) });
+  assert.equal(redrawn, `page redrawn. Page now shows: ${pageSummary(validateSpec(changed))}`);
+  assert.match(redrawn, /"Shorter list"/);
+
+  const reopened = await h.render_ui({ spec_json: '{"saved":"todo"}' });
+  assert.match(reopened, /^reopened the kept page "To-do list"; say it is ready, do not ask if they like it\. Page now shows: "/);
+
+  const aid = await createToolHandlers(fakeUi().ui).render_ui({ spec_json: JSON.stringify(cannedFirstAid()) });
+  assert.match(aid, /^first-aid page shown\. Page now shows: .*Steps: 1\. /);
 });
