@@ -41,7 +41,7 @@ export function toolConfigs() {
       name: t.name,
       description: t.description,
       expects_response: true,
-      response_timeout_secs: 10,
+      response_timeout_secs: ['open_scene', 'catalog_action'].includes(t.name) ? 25 : 10,
       // Say what you are about to do before a scene grows or changes.
       // A page revise takes the model a few seconds: a short sentence first keeps it feeling quick.
       ...(['open_scene', 'render_ui', 'revise_ui', 'secretary_action'].includes(t.name) ? { pre_tool_speech: 'force' } : {}),

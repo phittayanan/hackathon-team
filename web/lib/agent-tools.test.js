@@ -48,6 +48,22 @@ test('open_scene checks the scene and the JSON', async () => {
   assert.deepEqual(log[0], ['open', 'flight', { delayMinutes: 90 }]);
 });
 
+test('catalog tools reject invalid actions/data and cannot act on a payment or closed scene', async () => {
+  const { ui, log } = fakeUi({ name: 'payment', ctl: {} });
+  const h = createToolHandlers(ui);
+  for (const data_json of ['{bad', '[]', 'false']) assert.match(await h.catalog_action({ action: 'search', data_json }), /^error/);
+  assert.match(await h.catalog_action({ action: 'pay' }), /^error/);
+  assert.match(await h.catalog_action({ action: 'select', data_json: '{"product_id":"x"}' }), /no catalog/);
+  assert.deepEqual(log, []);
+  ui.closeScene();
+  assert.match(await h.catalog_action({ action: 'read' }), /no catalog/);
+});
+
+test('a catalog read waiting for results does not return a scene that the owner closed', async () => {
+  const { ui } = fakeUi({ name: 'shopping', ctl: { state: () => ({ catalog: true }), ready: async () => ui.closeScene() } });
+  assert.match(await createToolHandlers(ui).catalog_action({ action: 'read' }), /closed or replaced/);
+});
+
 test('render_ui validates the spec; unknown components are dropped', async () => {
   const { ui, log } = fakeUi();
   const h = createToolHandlers(ui);

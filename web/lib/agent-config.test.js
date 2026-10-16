@@ -28,6 +28,7 @@ test('client tools match the browser handlers and are JSON-schema objects', () =
     assert.equal(t.parameters.type, 'object');
   }
   assert.deepEqual(tools.find((t) => t.name === 'scene_action').parameters.properties.action.enum, ['confirm', 'decline', 'close']);
+  for (const name of ['open_scene', 'catalog_action']) assert.ok(tools.find((t) => t.name === name).response_timeout_secs > 15, 'catalog fetch can take 15 seconds');
 });
 
 test('idle silence skips the turn while important notifications remain enabled', () => {
