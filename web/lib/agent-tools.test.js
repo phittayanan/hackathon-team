@@ -56,6 +56,8 @@ test('search_videos opens only a validated YouTube results URL and reports its l
   const out = await h.search_videos({ query: 'rubric' });
   assert.match(out, /no video was watched or verified/);
   assert.deepEqual(log.at(-1), ['open', 'video-search', { query: "Rubik's Cube" }]);
+  await h.search_videos({ query: 'latte art', kind: 'shorts' });
+  assert.deepEqual(log.at(-1), ['open', 'video-search', { query: 'latte art', shorts: true }]);
 });
 
 test('open_scene returns the open scene\'s summary so the agent knows its facts', async () => {

@@ -41,3 +41,37 @@ test('the videos route: no key -> unavailable, an API error -> a short error and
   assert.equal(out.error, 'ค้นหาวิดีโอไม่สำเร็จ');
   assert.deepEqual(out.videos, []);
 });
+
+test('ISO 8601 lengths become seconds', async () => {
+  const { seconds } = await import('./youtube-videos.js');
+  assert.deepEqual(['PT45S', 'PT1M5S', 'PT3M', 'P1DT2H', 'P0D', 'PT', 'P', '', 'x'].map(seconds), [45, 65, 180, 93600, 0, null, null, null, null]);
+});
+
+test('Shorts mode searches short clips with #shorts and keeps only clips of 3 minutes or less', async () => {
+  const urls = [];
+  const fetchImpl = async (url) => {
+    urls.push(new URL(url));
+    if (urls.length === 1) return reply([item('aaaaaaaaaaa'), item('bbbbbbbbbbb'), item('ccccccccccc'), item('ddddddddddd')])();
+    return { ok: true, json: async () => ({ items: [
+      { id: 'aaaaaaaaaaa', contentDetails: { duration: 'PT45S' } },
+      { id: 'bbbbbbbbbbb', contentDetails: { duration: 'PT3M1S' } },
+      { id: 'ccccccccccc', contentDetails: { duration: 'PT3M' } },
+    ] }) };
+  };
+  const out = await searchYouTubeVideos({ query: 'latte art', shorts: true }, env, fetchImpl);
+  assert.equal(urls[0].searchParams.get('q'), 'latte art #shorts');
+  assert.equal(urls[0].searchParams.get('videoDuration'), 'short');
+  assert.equal(urls[1].pathname, '/youtube/v3/videos');
+  assert.equal(urls[1].searchParams.get('id'), 'aaaaaaaaaaa,bbbbbbbbbbb,ccccccccccc,ddddddddddd');
+  assert.equal(out.shorts, true);
+  assert.deepEqual(out.videos.map((v) => [v.id, v.seconds]), [['aaaaaaaaaaa', 45], ['ccccccccccc', 180]]);
+});
+
+test('ordinary search makes one call and only a literal true turns Shorts on', async () => {
+  let calls = 0;
+  const out = await searchYouTubeVideos({ query: 'latte art', shorts: 'yes' }, env, async (url) => {
+    calls++; assert.equal(new URL(url).searchParams.get('videoDuration'), null); return reply([item('aaaaaaaaaaa')])();
+  });
+  assert.equal(calls, 1);
+  assert.equal(out.shorts, false);
+});

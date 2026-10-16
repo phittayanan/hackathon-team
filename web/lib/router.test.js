@@ -18,6 +18,15 @@ test('video tutorial requests open YouTube search with the useful subject terms'
   assert.match(r.say, /YouTube/);
 });
 
+test('a Shorts request opens the video scene in Shorts mode; ordinary words do not', () => {
+  const r = keywordRoute('ขอดูช็อตส์สอนทำกาแฟหน่อย');
+  assert.equal(r.scene, 'video-search');
+  assert.equal(r.data.shorts, true);
+  assert.equal(r.data.query, 'ทำกาแฟ');
+  assert.equal(keywordRoute('ช่วยหาวิดีโอสอนเล่น rubric ให้หน่อย').data.shorts, undefined);
+  assert.notEqual(keywordRoute('keyboard shortcut').scene, 'video-search');
+});
+
 test('voice can never approve a payment', () => {
   for (const said of ['allow', 'yes', 'ok pay now', 'อนุมัติ', 'จ่ายเลย']) {
     const r = keywordRoute(said, 'payment');
