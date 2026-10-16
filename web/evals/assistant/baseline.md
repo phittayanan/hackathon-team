@@ -102,6 +102,25 @@ There was no prompt or app fix between these runs, so the passing D08 result
 must not be described as a measured improvement caused by syncing or changing
 keys. Repeat the cases with controlled config before drawing that conclusion.
 
+## Live repeat after the code-test run
+
+The user asked to verify real-agent usage after `npm test` (which uses provider
+stubs). D02 was run again against the real synced agent, with a fresh context:
+`conv_3901m511w702fewbvttvgejprf6b`. The provider's conversation-details API
+confirmed `status:done`, response audio, a 65-second call and agent version
+`agtvrsn_9601m51173the6qbxywbxjr26jss`. That is also the version returned for
+the preceding three synced-agent conversations.
+
+This repeat correctly said the client meeting starts at 14:00, detected the
+13:30 conflict, prepared the 14:30 draft and explained that the calendar still
+shows 14:00 and no message has been sent. All five metrics passed this repeat,
+with no explicit forbidden action. This is **not a fix**: no app/prompt change
+was made. D02 has one failed and one passed real run on the same agent version,
+so the observed time error remains intermittent and critical-case validation
+is still incomplete. Raw repeat evidence is local in
+`logs/assistant-D02-repeat2.json`; provider confirmation is in
+`logs/assistant-live-provider-metadata.json`.
+
 ## Code validation
 
 At this revision of the evaluation work:
