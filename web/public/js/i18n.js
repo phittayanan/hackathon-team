@@ -1,4 +1,6 @@
 // UI language only. Conversation text and editable values are never rewritten.
+import { SUGGESTION_POOL } from './suggest.js';
+
 const pairs = [
   ['พิมพ์ที่นี่', 'Type here'], ['ส่ง', 'Send'], ['กดค้างเพื่อพูด', 'Hold to talk'],
   ['กดค้างที่ไมค์เพื่อพูด', 'Hold the mic to talk'], ['แตะหน้าจอเพื่อเปิดเสียง', 'Tap to turn on sound'],
@@ -6,8 +8,7 @@ const pairs = [
   ['ข้อความเสียง', 'Voice transcript'], ['พิมพ์สิ่งที่ต้องการบอก', 'Type what you want to say'],
   ['หน้าหลัก Q-Bot', 'Agent home'], ['นำทางงาน', 'Task navigation'], ['เลขาส่วนตัว', 'Personal assistant'],
   ['ภาษา UI', 'UI language'], ['มุมมองเลขา', 'Secretary views'], ['ลองพูดว่า', 'Try saying'],
-  ['สัปดาห์นี้ยุ่งมาก', 'This week is hectic'], ['วางแผนซ้อมวิ่ง 10K', 'Plan my 10K training'],
-  ['ทำ to-do list ให้หน่อย', 'Make me a to-do list'],
+  ...SUGGESTION_POOL.map((s) => [s.say, s.en]),
   ['สรุปวันนี้', 'Today'], ['อีเมล → งาน', 'Email → Tasks'], ['ทดสอบการแจ้งเตือน', 'Test notifications'],
   ['ข้อมูลจำลอง ไม่ส่งเมลหรือแก้ปฏิทินจริง', 'Simulated data. No real email or calendar changes.'],
   ['เหตุการณ์', 'Event'], ['แจ้งเมื่อ', 'Notify me'], ['ทันทีเมื่อหน้าหลักว่าง', 'When the home screen is idle'],

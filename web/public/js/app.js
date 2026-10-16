@@ -12,7 +12,8 @@ import { connectAgent, fireFeed } from './agent-link.js';
 import { live, checkLive, prepareLive, startLive, setMic, sendText, sendContext, sendFeed, silenceAgent, afterAgentStarts } from './live-agent.js';
 import { T, TEST, PRESENTER, wait } from './timing.js';
 import { plan, watchScenes } from './plan.js';
-import { hasMemory } from './memory.js';
+import { hasMemory, recall } from './memory.js';
+import { pickSuggestions } from './suggest.js';
 import { noteFeed, noteHeard, noteRevise, proactiveWatch, forgetOnRequest } from './learn.js';
 import { createSecretary } from './secretary.js';
 import { setupSecretaryDemo } from './secretary-demo.js';
@@ -110,26 +111,28 @@ async function sayThenOpen({ line, text }, name, data, current = () => true) {
   return show;
 }
 
-// What the agent offers after its greeting: one tap sends it as the user's own words (live agent or
-// offline router). Together they cover the demo: shopping list from email and pay, training and race
-// sign-up, a generated to-do list. The flight delay comes from the agent itself (always-on feed).
-export const SUGGESTIONS = [
-  { say: 'สัปดาห์นี้ยุ่งมาก', kind: 'shopping' },
-  { say: 'วางแผนซ้อมวิ่ง 10K', kind: 'training' },
-  { say: 'ทำ to-do list ให้หน่อย', kind: 'generated' },
-];
+// What the agent offers after its greeting (suggest.js): one tap sends it as the user's own words,
+// to the live agent or the offline router. A different set from the one shown last time.
+const LAST_SUGGESTIONS = 'qbot.suggestions';
 
-function setupSuggestions() {
+function showSuggestions(list) {
   const nav = $('suggest');
-  for (const s of SUGGESTIONS) {
+  nav.replaceChildren(...list.map((s) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'g-chip';
     btn.dataset.kind = s.kind;
     btn.textContent = s.say;
     btn.addEventListener('click', () => { logEvent('suggestion', { kind: s.kind }); submitText(s.say, 'suggestion'); });
-    nav.append(btn);
-  }
+    return btn;
+  }));
+  try { localStorage.setItem(LAST_SUGGESTIONS, JSON.stringify(list.map((s) => s.say))); } catch { /* storage can be disabled */ }
+}
+
+function setupSuggestions() {
+  let last = [];
+  try { last = JSON.parse(localStorage.getItem(LAST_SUGGESTIONS) || '[]'); } catch { /* none kept */ }
+  showSuggestions(pickSuggestions({ facts: recall(), last: Array.isArray(last) ? last : [] }));
 }
 
 // The agent speaks first (always-on feed event offline, or a presenter hotkey).
@@ -397,7 +400,7 @@ async function boot() {
   } });
   document.body.dataset.ready = '1';
   // For tests and the presenter console.
-  window.agentOS = { openScene, closeScene, handleUserText, proactive, fireFeed, secretary, noticeTest: noticeTest.show };
+  window.agentOS = { openScene, closeScene, handleUserText, proactive, fireFeed, secretary, noticeTest: noticeTest.show, showSuggestions };
 }
 
 boot();

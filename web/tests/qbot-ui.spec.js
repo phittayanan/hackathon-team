@@ -22,10 +22,22 @@ test('Q-Bot home: only the agent and the composer from the start, suggestions af
 
 test('a suggestion tap is sent as the user and opens its task', async ({ page }) => {
   await home(page);
-  await page.locator('#suggest button', { hasText: 'to-do' }).click();
-  await expect(page.locator('body')).toHaveAttribute('data-scene', 'generated', { timeout: 10_000 });
+  const chip = page.locator('#suggest button').first();
+  const [say, kind] = [await chip.textContent(), await chip.getAttribute('data-kind')];
+  await chip.click();
+  await expect(page.locator('body')).toHaveAttribute('data-scene', kind, { timeout: 10_000 });
   const typed = await page.evaluate(() => window.__runlog.find((e) => e.type === 'user_text'));
-  expect(typed).toMatchObject({ text: 'ทำ to-do list ให้หน่อย', via: 'suggestion' });
+  expect(typed).toMatchObject({ text: say, via: 'suggestion' });
+});
+
+test('the suggestions change from one visit to the next', async ({ page }) => {
+  await home(page);
+  const first = await page.locator('#suggest button').allTextContents();
+  await page.reload();
+  await expect(page.locator('body')).toHaveAttribute('data-ready', '1');
+  const second = await page.locator('#suggest button').allTextContents();
+  expect(second).toHaveLength(3);
+  expect([...second].sort()).not.toEqual([...first].sort());
 });
 
 test('language switches live, preserves user data and open task state, and survives reload', async ({ page }) => {
@@ -36,7 +48,9 @@ test('language switches live, preserves user data and open task state, and survi
   await page.locator('.secretary-task input').first().check();
   await page.locator('[data-language=en]').click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await expect(page.locator('#suggest button').first()).toHaveText('This week is hectic');
+  // Every suggestion shows in English (the tap still sends the Thai words).
+  const ens = await page.evaluate(async () => (await import('/js/suggest.js')).SUGGESTION_POOL.map((s) => s.en).concat('Today'));
+  for (const text of await page.locator('#suggest button').allTextContents()) expect(ens).toContain(text);
   await expect(page.locator('.secretary-title')).toHaveText('Email to tasks');
   await expect(page.locator('.secretary-task input').first()).toBeChecked();
   await expect(page.locator('#fallbackInput')).toHaveValue('ข้อความของฉัน');
@@ -52,7 +66,7 @@ test('language switches live, preserves user data and open task state, and survi
   await page.locator('[data-language=en]').click();
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await expect(page.locator('#suggest button').first()).toHaveText('This week is hectic');
+  for (const text of await page.locator('#suggest button').allTextContents()) expect(text).toMatch(/^[\x20-\x7e’]+$/);
 });
 
 for (const width of [320, 390]) {

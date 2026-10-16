@@ -34,6 +34,30 @@ for (const [width, height] of [[1440, 900], [1280, 800], [1920, 1080], [1280, 68
   });
 }
 
+// Suggestions are picked at random from a pool: the three widest lines must still fit, in both languages.
+for (const [width, height] of [[1280, 680], [390, 844], [320, 568]]) {
+  test(`the widest three suggestions fit at ${width}x${height} in Thai and English`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto('/?test=1');
+    await expect(page.locator('body')).toHaveAttribute('data-ready', '1');
+    await page.locator('[data-testid=intro]').click();
+    for (const lang of ['th', 'en']) {
+      await page.locator(`[data-language=${lang}]`).click();
+      const fits = await page.evaluate(async () => {
+        const { SUGGESTION_POOL } = await import('/js/suggest.js');
+        window.agentOS.showSuggestions(SUGGESTION_POOL);
+        await new Promise((r) => setTimeout(r, 100));
+        const widths = [...document.querySelectorAll('#suggest button')].map((b, i) => [b.getBoundingClientRect().width, SUGGESTION_POOL[i]]);
+        window.agentOS.showSuggestions(widths.sort((a, b) => b[0] - a[0]).slice(0, 3).map(([, s]) => s));
+        await new Promise((r) => setTimeout(r, 700));
+        const home = document.querySelector('#home');
+        return home.scrollHeight <= home.clientHeight + 1 && document.documentElement.scrollHeight <= innerHeight;
+      });
+      expect(fits, lang).toBe(true);
+    }
+  });
+}
+
 test('typing first, before any tap, gets an answer and no late greeting', async ({ page }) => {
   await page.goto('/?test=1');
   await expect(page.locator('body')).toHaveAttribute('data-ready', '1');
