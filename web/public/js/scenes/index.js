@@ -7,5 +7,6 @@ import training from './training.js';
 import generated from './generated.js';
 import secretary from './secretary.js';
 import memory from './memory.js';
+import videoSearch from './video-search.js';
 
-export const SCENES = { payment, shopping, flight, training, generated, secretary, memory };
+export const SCENES = { payment, shopping, flight, training, generated, secretary, memory, 'video-search': videoSearch };
