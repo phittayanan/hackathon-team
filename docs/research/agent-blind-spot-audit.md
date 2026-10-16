@@ -1,6 +1,16 @@
 # Agent blind-spot audit for Q-Bot
 
-<!-- SUMMARY -->
+**Result.** Reading the code found 12 new blind spots besides the known `render_ui` one. Most share one cause: tools tell the agent a name ("opened payment"), not what the screen shows, and a new session does not know which page is open.
+
+**Meaning.** On stage, a follow-up about the screen ("how much?", "which is cheapest?") gets a vague answer, and after 20 quiet seconds the agent forgets the open page.
+
+**Fix next.**
+
+1. Tell a new session which page is open (gap 1).
+2. Make `open_scene` return the scene's facts (gap 2).
+3. Send catalog results and the chosen product to the agent (gap 3).
+
+**Adopt.** ElevenLabs agent tests, each mock result copied from the real handler.
 
 A blind spot is something the user can see or do that the agent cannot see, check or undo.
 The first one found: after `render_ui` the agent got back only `page shown`.
@@ -166,3 +176,70 @@ Severity: **judges would notice** (likely in a 3-minute demo), **sometimes** (ne
 - It cannot stop the training sign-up: it fills and submits itself with no tap (`training.js:51-83`); `scene_action` has no handler there (gap 5).
 - It cannot check that a `remember` or `keep_scene` stuck beyond the result line; that is fine.
 - It can never approve a payment (`agent-tools.js:234-237`, `payment.js` Allow tap only). This is by design and correct.
+
+## Appendix. The audit prompt
+
+Run it in a coding agent (Claude Code or Codex) at the repo root, reading code only.
+It makes no ElevenLabs call and changes no file. Paste everything between the lines.
+
+---
+
+```text
+You are auditing a voice and text agent for blind spots. A blind spot is something the user can
+see, do or change that the agent cannot see, check or undo. Read code only. Do not run the app,
+call any API, or edit any file.
+
+Files to read first:
+- web/agent/prompt.md (whole file): the agent's system prompt.
+- web/agent/config.js: the tool list, tool settings (expects_response, response_timeout_secs,
+  tool_error_handling_mode, pre_tool_speech) and built-in tools.
+- web/public/js/agent-tools.js: each tool's definition and every string each handler returns.
+- web/public/js/live-agent.js: every sendContextualUpdate, sendUserMessage and sendContext call,
+  and what happens when a session starts and ends.
+- web/public/js/app.js: tellAgent, every [screen] message, openScene and closeScene.
+Reach everything else with grep (scenes in web/public/js/scenes/, voice.js, agent-loop.js,
+agent-link.js, data.js) and read only the matching lines.
+
+Step 1. Make an inventory of channels into the agent:
+- every tool (client and built-in);
+- every message the page sends: contextual updates, user messages, tagged messages such as
+  [screen], [scene event], [feed update], [session start];
+- dynamic variables filled at session start.
+For each, give file:line and the exact text or return string the agent receives.
+
+Step 2. For each channel, answer three questions with file:line evidence:
+a. After this, what does the agent know? Quote the exact string; do not assume more.
+b. What can the user see or do now that the agent cannot? Follow the code into the scene that
+   opens or changes: list what it draws, what it fetches later, every button and input, and
+   whether each tap or result is sent to the agent.
+c. What can the agent not undo or check? Actions that complete by themselves, handlers that
+   report success without doing anything, errors that are swallowed or hidden, timeouts.
+Also check these cross-cutting paths: a scene opened by something other than a tool (another
+scene, a hotkey, a feed loop); a scene replaced without close; a session that ends and restarts
+while a scene stays open; the offline brain taking over.
+
+Step 3. Check the prompt against the tools:
+- every tool, parameter, enum value, field and message tag the prompt names: does it exist, and
+  does the code behave as the prompt says?
+- every tool and parameter the code defines: does the prompt explain when and how to use it,
+  including the shape of JSON parameters?
+- one tag or word with two meanings, and instructions that can never fire (for example a turn
+  the agent never gets because the message is a contextual update).
+
+Step 4. List each gap as one table row:
+| # | Severity | Where (file:line) | User story | Smallest fix |
+- User story: one line, "User says X; the agent cannot answer because Y."
+- Severity: "judges would notice" (likely in a 3-minute stage demo), "sometimes" (needs a
+  natural but less common turn), or "rare".
+- Smallest fix: one line, the least code that closes the gap.
+Sort by severity. Mark gaps already being fixed as "known, fix in progress" and do not count
+them as new. Never fill a gap with a guess: if the code does not show it, write "unclear" and
+say what to read next.
+
+Step 5. Above the table, write at most 120 words in simple English: Result, Meaning for the demo,
+and the top three gaps to fix next.
+```
+
+---
+
+Known fixes to tell the auditor about on each run (update this list): `fix: Q-Bot knows what is on the page it made` (render_ui / revise_ui content and taps on generated pages).
