@@ -76,6 +76,16 @@ export function catalogSummary(facts = {}) {
   return clip(`${head}: ${facts.results.length} results: ${list}.${facts.chosen ? ` Chosen: ${facts.chosen}.` : ''} Choosing is not buying.`);
 }
 
+// The [screen] note with the user's health facts, sent once when a live session starts, so the agent
+// can make a page for exactly what was asked (for example sleep only) without opening training.
+export function healthNote(data = {}) {
+  const week = (data.plan || []).map((p) => `${p.day} ${p.run} at ${p.pace}`).join(', ');
+  return clip(
+    `[screen] The user's health feed (no page shows it now): sleep score ${data.sleepScore}, ${data.sleepHours} asleep, ` +
+    `resting heart rate ${data.restingHr} bpm. Run plan this week: ${week}. Use it for a page or an answer; do not read this note aloud.`,
+  );
+}
+
 // The [screen] note for a page that is open when a new live session starts; '' on the home.
 // current: { name, ctl } from the app; generated pages use the page summary (genui.js).
 export function openPageNote(current) {

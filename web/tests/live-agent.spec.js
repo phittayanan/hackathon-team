@@ -202,6 +202,10 @@ test('live: typed text goes to the agent, and feed changes arrive as contextual 
   await page.fill('#fallbackInput', 'this week is hectic');
   await page.keyboard.press('Enter');
   await expect.poll(() => page.evaluate(() => window.__conv.sent)).toEqual(['this week is hectic']);
+  // The health facts arrive once, silently, at session start, so a sleep ask gets its own page.
+  expect(await page.evaluate(() => window.__conv.context.filter((t) => t.startsWith("[screen] The user's health feed")))).toEqual([
+    expect.stringMatching(/sleep score 86, 7 h 40 m asleep, resting heart rate 54 bpm\. Run plan this week: Today Easy 5 km/),
+  ]);
   // The offline router must not open anything by itself in live mode.
   await expect(page.locator('body')).toHaveAttribute('data-scene', 'home');
   // The agent answers (this ends the thinking state; feed updates wait while the agent thinks).
