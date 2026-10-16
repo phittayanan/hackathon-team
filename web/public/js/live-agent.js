@@ -4,6 +4,7 @@
 // One voice: while connected, every app line is said by the agent (voice.js setLiveVoice).
 // If anything fails, the app keeps its offline brain: keyword router, cached MP3s, canned pages.
 import { createToolHandlers, keptPagesNote } from './agent-tools.js';
+import { openPageNote } from './scene-summary.js';
 import { showSubtitle, setLiveVoice } from './voice.js';
 import { logEvent } from './log.js';
 import { apiFetch, goOffline, onOffline, micBlocked } from './api.js';
@@ -278,6 +279,9 @@ export function startLive(ui) {
     // Pages kept in earlier visits: the agent can reopen them by voice (see keptPagesNote).
     const kept = keptPagesNote(ui.saved?.());
     if (kept) conversation.sendContextualUpdate(kept);
+    // A page still open from the last session (it ended after 20 s idle): say which one and what it shows.
+    const page = openPageNote(ui.current?.());
+    if (page) conversation.sendContextualUpdate(page);
     return conversation;
   })().catch((err) => {
     console.warn('[agent] live agent unavailable, offline brain stays on:', err.message);

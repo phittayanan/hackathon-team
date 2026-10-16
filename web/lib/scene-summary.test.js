@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SCENE_DEFAULTS } from '../public/js/data.js';
-import { paymentSummary, flightSummary, shoppingSummary, trainingSummary, catalogSummary, clip, SCENE_SUMMARY_MAX } from '../public/js/scene-summary.js';
+import { paymentSummary, flightSummary, shoppingSummary, trainingSummary, catalogSummary, clip, openPageNote, SCENE_SUMMARY_MAX } from '../public/js/scene-summary.js';
 
 test('payment summary: merchant, total, every rule passed and Allow enabled', () => {
   const s = paymentSummary(SCENE_DEFAULTS.payment);
@@ -57,4 +57,14 @@ test('clip folds whitespace and cuts with an ellipsis at the limit', () => {
   const long = clip('x'.repeat(1000));
   assert.equal(long.length, SCENE_SUMMARY_MAX);
   assert.ok(long.endsWith('…'));
+});
+
+test('open page note: a scene\'s summary, a generated page\'s summary, a bare name, nothing on the home', () => {
+  assert.equal(openPageNote(null), '');
+  assert.equal(openPageNote({ name: 'payment', ctl: { summary: () => 'Payment request to FreshMart Online, total ฿849.' } }),
+    '[screen] The payment page is open: Payment request to FreshMart Online, total ฿849.');
+  const spec = { title: 'Packing list', blocks: [{ type: 'checklist', items: [{ text: 'Passport', done: true }] }] };
+  assert.match(openPageNote({ name: 'generated', ctl: { state: () => ({ spec }) } }), /^\[screen\] The generated page is open: "Packing list"\. .*Passport/);
+  assert.equal(openPageNote({ name: 'secretary', ctl: {} }), '[screen] The secretary page is open.');
+  assert.ok(openPageNote({ name: 'x', ctl: { summary: () => 'y'.repeat(900) } }).length <= SCENE_SUMMARY_MAX + 40);
 });

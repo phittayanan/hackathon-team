@@ -147,6 +147,29 @@ test('live: kept pages are told to the agent at session start and when kept, and
   expect(await tool(page, 'render_ui', { spec_json: '{"saved":"nope"}' })).toMatch(/^error/);
 });
 
+test('live: a new session after the old one ended hears which page is open and what it shows', async ({ page }) => {
+  await liveHome(page);
+  const spec = { kind: 'packing', title: 'Packing list', blocks: [{ type: 'checklist', items: [{ text: 'Passport' }] }] };
+  await tool(page, 'render_ui', { spec_json: JSON.stringify(spec) });
+  await expect(page.locator('[data-testid=g-title]')).toHaveText('Packing list');
+  // The session ends (20 s idle or the agent hangs up); the page stays open.
+  await page.evaluate(() => window.__conv.opts.onDisconnect({ reason: 'agent' }));
+  await expect(page.locator('body')).toHaveAttribute('data-brain', 'asleep');
+  await page.locator('#mic').dispatchEvent('pointerdown');
+  await expect(page.locator('body')).toHaveAttribute('data-brain', 'agent');
+  await page.locator('#mic').dispatchEvent('pointerup');
+  await expect.poll(() => page.evaluate(() => window.__conv.context.join('\n'))).toMatch(/\[screen\] The generated page is open: "Packing list"\. .*Passport/);
+
+  // Same for a prebuilt scene: the payment card's total and rules.
+  await tool(page, 'open_scene', { scene: 'payment' });
+  await expect(page.locator('body')).toHaveAttribute('data-scene', 'payment');
+  await page.evaluate(() => window.__conv.opts.onDisconnect({ reason: 'agent' }));
+  await page.locator('#mic').dispatchEvent('pointerdown');
+  await expect(page.locator('body')).toHaveAttribute('data-brain', 'agent');
+  await page.locator('#mic').dispatchEvent('pointerup');
+  await expect.poll(() => page.evaluate(() => window.__conv.context.join('\n'))).toMatch(/\[screen\] The payment page is open: Payment request to FreshMart Online, total ฿849\. Rules:/);
+});
+
 test('live: typed text goes to the agent, and feed changes arrive as contextual updates', async ({ page }) => {
   await liveHome(page);
   await page.fill('#fallbackInput', 'this week is hectic');
