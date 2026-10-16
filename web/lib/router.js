@@ -6,7 +6,7 @@
 import { SCENE_DEFAULTS } from '../public/js/data.js';
 import { LINES } from '../public/js/lines.js';
 import { cannedTodo, cannedFirstAid, reviseByKeywords, validateSpec, TODO_WORDS, URGENT_WORDS } from '../public/js/genui.js';
-import { videoQueryFromRequest } from '../public/js/youtube-search.js';
+import { videoQueryFromRequest, wantsShorts } from '../public/js/youtube-search.js';
 
 const has = (text, words) => words.some((w) => text.includes(w));
 
@@ -61,10 +61,11 @@ export function keywordRoute(rawText, context = null, extra = {}) {
   if (context === 'generated') return generatedAction(text, extra);
   // Health, injury or emergency comes first: first-aid steps at once.
   if (has(text, URGENT_WORDS)) return { scene: 'generated', line: 'first_aid', say: LINES.first_aid, data: { spec: cannedFirstAid() } };
-  if (has(text, ['วิดีโอ', 'คลิป', 'ยูทูบ', 'youtube', 'video', 'videos', 'tutorial']) || has(text, ['สอนเล่น', 'how to play'])) {
+  if (has(text, ['วิดีโอ', 'คลิป', 'ยูทูบ', 'youtube', 'video', 'videos', 'tutorial']) || has(text, ['สอนเล่น', 'how to play']) || wantsShorts(text)) {
     const result = videoQueryFromRequest(rawText);
     if (!result) return speakLine('unsure');
-    return { scene: 'video-search', say: `เปิดผลค้นหาวิดีโอเรื่อง ${result.query} บน YouTube ให้ค่ะ`, data: { query: result.query } };
+    const say = result.shorts ? `เปิด Shorts เรื่อง ${result.query} ให้ค่ะ` : `เปิดผลค้นหาวิดีโอเรื่อง ${result.query} บน YouTube ให้ค่ะ`;
+    return { scene: 'video-search', say, data: { query: result.query, ...(result.shorts ? { shorts: true } : {}) } };
   }
   if (has(text, ['หาสินค้า', 'ค้นสินค้า', 'หาหูฟัง', 'เปรียบเทียบราคา', 'find products', 'find headphones', 'compare prices'])) {
     const budget = text.match(/(?:งบ(?:ไม่เกิน)?|ไม่เกิน)\s*([\d,]+)/);

@@ -10,6 +10,7 @@ import { createImageService } from './images.js';
 import { createRunLog, createConsoleLog } from './runlog.js';
 import { createUsage, LimitError } from './usage.js';
 import { searchShopifyCatalog } from './shopify-catalog.js';
+import { searchYouTubeVideos, videosReady } from './youtube-videos.js';
 import { pageReady, streamPage, PAGE_TIMEOUT_MS } from './page-model.js';
 import { validateSpec } from '../public/js/genui.js';
 
@@ -57,6 +58,17 @@ export function createHandlers({
       await take('calls', headers);
       try { return await searchShopifyCatalog(body, env); }
       catch (err) { return { error: err.name === 'TimeoutError' ? 'Shopify ค้นหานานเกินไป กรุณาลองใหม่' : err.message }; }
+    },
+    // A list of YouTube videos for the video-search scene. No key -> { unavailable: true } and the scene
+    // keeps only its link to YouTube's own results page.
+    async videos(headers = {}, body = {}) {
+      if (!videosReady(env)) return { unavailable: true, videos: [] };
+      await take('calls', headers);
+      try { return await searchYouTubeVideos(body, env, fetchImpl); }
+      catch (err) {
+        runLog.server('error', { where: 'videos', message: err.message });
+        return { error: err.name === 'TimeoutError' ? 'YouTube ค้นหานานเกินไป' : 'ค้นหาวิดีโอไม่สำเร็จ', videos: [] };
+      }
     },
     async health() {
       return {

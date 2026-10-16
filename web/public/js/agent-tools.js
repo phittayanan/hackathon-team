@@ -6,7 +6,7 @@ import { plan as screenPlan } from './plan.js';
 import { remember as keepFact, forgetMemory, MEMORY_KEYS } from './memory.js';
 import * as learner from './learn.js';
 import { resetStyle } from './style.js';
-import { videoQueryFromRequest } from './youtube-search.js';
+import { videoQueryFromRequest, wantsShorts } from './youtube-search.js';
 
 export const PROACTIVE_SCENES = ['shopping', 'payment', 'flight', 'training'];
 const SECRETARY_ACTIONS = ['today', 'email', 'add_tasks', 'draft', 'acknowledge', 'snooze'];
@@ -37,11 +37,13 @@ export const TOOL_DEFS = [
   {
     name: 'search_videos',
     description:
-      'Find tutorial videos by opening YouTube search results. Use when the user asks to find, recommend, or watch a video/tutorial. ' +
+      'Find tutorial videos: opens a screen listing YouTube search results (title and channel); the user taps one to play it in the app. ' +
+      'Use when the user asks to find, recommend, or watch a video/tutorial. ' +
       'Pass concise search terms in the user\'s language; for Rubik\'s Cube tutorials use spelling "Rubik\'s Cube". ' +
-      'This opens YouTube results in a new tab; it does not fetch or rank individual videos. Never claim you watched or verified a specific video.',
+      'The list comes from YouTube search ranking; a [screen] note tells you the titles. Never claim you watched or verified a video.',
     params: {
       query: { type: 'string', description: 'Concise video search terms, 2 to 160 characters', required: true },
+      kind: { type: 'string', enum: ['videos', 'shorts'], description: 'shorts = YouTube Shorts (short vertical clips, swipe feed) when the user asks for Shorts or short clips; otherwise videos', required: false },
     },
   },
   {
@@ -159,7 +161,7 @@ const SCENE_TASKS = {
   training: '10K training plan and race sign-up',
 };
 export function lastTask(name, params = {}) {
-  if (name === 'search_videos') return `searched YouTube videos: ${String(params.query || '').slice(0, 80)}`;
+  if (name === 'search_videos') return `searched YouTube ${params.kind === 'shorts' ? 'Shorts' : 'videos'}: ${String(params.query || '').slice(0, 80)}`;
   if (name === 'open_scene' && params.scene === 'shopping' && parseJson(params.data_json)?.catalog === true) return 'product discovery through Shopify';
   if (name === 'open_scene') return SCENE_TASKS[params.scene] || null;
   if (name === 'render_ui') {
@@ -241,11 +243,11 @@ function createScreenHandlers(ui, learn) {
   };
 
   return {
-    async search_videos({ query } = {}) {
-      const result = videoQueryFromRequest(query);
+    async search_videos({ query, kind } = {}) {
+      const result = videoQueryFromRequest(query, kind === 'shorts' || wantsShorts(query));
       if (!result) return 'error: provide a video search query of at least 2 characters';
-      await ui.openScene('video-search', { query: result.query });
-      return `opened YouTube search results for "${result.query}"; tell the user to choose a video from the results; no individual video was fetched or verified`;
+      await ui.openScene('video-search', { query: result.query, ...(result.shorts ? { shorts: true } : {}) });
+      return `opened a list of YouTube ${result.shorts ? 'Shorts' : 'results'} for "${result.query}"; tell the user to tap a clip to play it; titles arrive in a [screen] note; no video was watched or verified`;
     },
     secretary_action({ action, minutes = '1' } = {}) {
       if (!SECRETARY_ACTIONS.includes(action) || (action === 'snooze' && !['1', '5'].includes(minutes))) return 'error: invalid secretary action';

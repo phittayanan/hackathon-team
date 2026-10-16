@@ -67,6 +67,7 @@ Copy [.env.example](.env.example) to `.env` at the repo root and fill in:
 | `ELEVENLABS_API_KEY` + `ELEVENLABS_AGENT_ID` | The brain is a live ElevenLabs agent (Claude Sonnet 5.5 inside, Thai voice and speech to text). It changes the screen only through client tools: it opens scenes, draws new pages and decides when to speak first | Keywords pick the screen, a to-do request gets one ready-made page, simple rules decide when to speak first |
 | `ELEVENLABS_API_KEYS` | Several teammates' ElevenLabs keys, comma separated, used in order; one out of credit is skipped for the day (see [Add an ElevenLabs account](#add-an-elevenlabs-account)) | The single `ELEVENLABS_API_KEY` account only |
 | `TAVILY_API_KEY` | The agent gets a `web_search` tool (Tavily, free tier, basic search). Results go on a generated page with source links | There is no search tool. Nothing else changes |
+| `YOUTUBE_API_KEY` | A video request shows a list of YouTube clips (YouTube Data API v3, free quota about 100 searches a day); a tap plays the clip in the app | The video screen shows only a link to YouTube's own results page |
 | `UPSTASH_REDIS_REST_URL` + `_TOKEN` | The daily limit is shared by every Vercel function instance (free Upstash Redis) | The limit is counted in memory: exact locally, best effort on Vercel |
 
 Then run `cd web && npm run agent:sync` once. It creates the agents from
@@ -203,6 +204,7 @@ needed. One-time steps for the captain:
    ```text
    npx vercel env add ELEVENLABS_API_KEYS production
    npx vercel env add TAVILY_API_KEY production
+   npx vercel env add YOUTUBE_API_KEY production
    ```
 
    Use the same values as in `.env`. For an exact daily limit across
