@@ -10,6 +10,7 @@ import { createImageService } from './images.js';
 import { createRunLog, createConsoleLog } from './runlog.js';
 import { createUsage, LimitError } from './usage.js';
 import { searchShopifyCatalog } from './shopify-catalog.js';
+import { searchPlaces } from './places.js';
 import { pageReady, streamPage, PAGE_TIMEOUT_MS } from './page-model.js';
 import { validateSpec } from '../public/js/genui.js';
 
@@ -57,6 +58,12 @@ export function createHandlers({
       await take('calls', headers);
       try { return await searchShopifyCatalog(body, env); }
       catch (err) { return { error: err.name === 'TimeoutError' ? 'Shopify ค้นหานานเกินไป กรุณาลองใหม่' : err.message }; }
+    },
+    // The user's position goes to Google only for this search; it is never logged or kept.
+    async places(headers = {}, body = {}) {
+      await take('calls', headers);
+      try { return await searchPlaces(body, env, fetchImpl); }
+      catch (err) { return { error: err.name === 'TimeoutError' ? 'Google Maps ค้นหานานเกินไป กรุณาลองใหม่' : err.message }; }
     },
     async health() {
       return {

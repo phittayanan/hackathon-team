@@ -55,6 +55,23 @@ function generatedAction(text, { spec, stage } = {}) {
   return speakLine('gen_what', { action: 'ask' });
 }
 
+// "ร้านกาแฟแถวนี้" / "cafe near me" -> "ร้านกาแฟ" / "cafe"; null when the text asks for nothing nearby.
+const NEAR = /(?:ใกล้\s*ๆ?\s*(?:ฉัน|ผม|เรา|นี้)?|แถว\s*นี้|ละแวก\s*นี้|near\s*(?:me|by|here)|nearby|around\s*here)/i;
+// Offline only: the live agent decides by itself; the keyword brain needs a kind of place too.
+const PLACE_WORDS = ['ร้าน', 'คาเฟ่', 'กาแฟ', 'โรงพยาบาล', 'คลินิก', 'ขายยา', 'atm', 'เอทีเอ็ม', 'ปั๊ม', 'ห้าง', 'เซเว่น', '7-11', 'ธนาคาร', 'ตลาด',
+  'cafe', 'coffee', 'restaurant', 'pharmacy', 'hospital', 'clinic', 'gas station', 'bank', 'mall', 'market'];
+export function placeQuery(rawText) {
+  const raw = String(rawText || '').replace(/\s+/g, ' ').trim();
+  if (!NEAR.test(raw) || !has(raw.toLowerCase(), PLACE_WORDS)) return null;
+  const q = raw.replace(NEAR, ' ')
+    .replace(/^(?:please\s+)?(?:find|search\s+for|where\s+is|where's|any)\s+(?:an?\s+|the\s+)?/i, '')
+    .replace(/^(?:ช่วย\s*)?(?:หา|ค้นหา|แนะนำ|มี)\s*/, '')
+    .replace(/\s*(?:ให้หน่อย|หน่อย|ที|ได้ไหม|มีไหม|ไหม|บ้าง|อยู่ไหน|ตรงไหน|please|for me)\s*$/i, '')
+    .replace(/\s*(?:มี|ที่)\s*$/, '')
+    .replace(/\s+/g, ' ').trim().slice(0, 160);
+  return q.length >= 2 ? q : null;
+}
+
 export function keywordRoute(rawText, context = null, extra = {}) {
   const text = String(rawText || '').toLowerCase().trim();
   if (!text) return { scene: null, line: 'unsure', say: LINES.unsure };
@@ -66,6 +83,8 @@ export function keywordRoute(rawText, context = null, extra = {}) {
     if (!result) return speakLine('unsure');
     return { scene: 'video-search', say: `เปิดผลค้นหาวิดีโอเรื่อง ${result.query} บน YouTube ให้ค่ะ`, data: { query: result.query } };
   }
+  const place = placeQuery(rawText);
+  if (place) return { scene: 'places', say: `จะหา${place}ใกล้ ๆ ใน Google Maps ให้ค่ะ`, data: { query: place } };
   if (has(text, ['หาสินค้า', 'ค้นสินค้า', 'หาหูฟัง', 'เปรียบเทียบราคา', 'find products', 'find headphones', 'compare prices'])) {
     const budget = text.match(/(?:งบ(?:ไม่เกิน)?|ไม่เกิน)\s*([\d,]+)/);
     return { scene: 'shopping', say: 'จะค้นสินค้าจาก Shopify มาให้เลือกค่ะ', data: { catalog: true, query: String(rawText).slice(0, 250), ...(budget ? { budget: Number(budget[1].replaceAll(',', '')) } : {}) } };

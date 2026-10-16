@@ -56,6 +56,7 @@ const pairs = [
   ['Q-Bot กำลังทำงาน', 'Q-Bot working'], ['Q-Bot กำลังฉลอง', 'Q-Bot celebrating'], ['Q-Bot เป็นห่วง', 'Q-Bot concerned'],
   ['ค้นหาวิดีโอบน YouTube', 'Search YouTube videos'], ['เปิดผลการค้นหา', 'Open search results'],
   ['เปิดผลการค้นหาล่าสุด แล้วเลือกคลิปที่ต้องการ', 'Open the latest results and choose a video'],
+  ['ใกล้ฉัน', 'Near me'], ['ดูใน Google Maps', 'Open in Google Maps'], ['สถานที่ใกล้คุณ', 'Places near you'],
 ];
 const dictionary = new Map(pairs.flatMap((pair) => pair.map((word) => [word, pair])));
 let language = 'th';

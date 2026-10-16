@@ -8,5 +8,6 @@ import generated from './generated.js';
 import secretary from './secretary.js';
 import memory from './memory.js';
 import videoSearch from './video-search.js';
+import places from './places.js';
 
-export const SCENES = { payment, shopping, flight, training, generated, secretary, memory, 'video-search': videoSearch };
+export const SCENES = { payment, shopping, flight, training, generated, secretary, memory, 'video-search': videoSearch, places };

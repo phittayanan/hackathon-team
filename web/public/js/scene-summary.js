@@ -93,3 +93,14 @@ export function openPageNote(current) {
   const summary = current.name === 'generated' ? pageSummary(current.ctl?.state?.()?.spec) : current.ctl?.summary?.();
   return `[screen] The ${current.name} page is open${summary ? `: ${clip(summary)}` : '.'}`;
 }
+
+// The places page: what the agent may say about the search. Coordinates are never included.
+export function placesSummary(facts = {}) {
+  const head = `Google Maps search${facts.query ? ` for "${facts.query}"` : ''}${facts.near === false ? ' (no user location: not sorted by nearness)' : ''}`;
+  if (facts.searching) return clip(`${head}: searching.`);
+  if (facts.error) return clip(`${head}: the search failed: ${facts.error}.`);
+  if (!facts.results) return clip(`${head}: no search yet.`);
+  if (!facts.results.length) return clip(`${head}: no places found.`);
+  const list = facts.results.map((r, n) => `${n + 1}. ${r.name}${r.distance ? ` ${r.distance}` : ''}${r.rating ? `, rating ${r.rating}` : ''}${r.open ? `, ${r.open}` : ''}`).join('; ');
+  return clip(`${head}: ${facts.results.length} results: ${list}. Only these places exist; never invent others.`);
+}
