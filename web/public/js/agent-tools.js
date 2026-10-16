@@ -1,7 +1,7 @@
 // Client tools of the ElevenLabs agent: the only way the live agent can change the UI.
 // Each tool gets plain parameters from the agent and returns a short text result to it.
 // The money rule lives here too: no tool can approve a payment. Only the owner's tap on Allow can.
-import { validateSpec } from './genui.js';
+import { validateSpec, pageSummary } from './genui.js';
 import { plan as screenPlan } from './plan.js';
 import { remember as keepFact, forgetMemory, MEMORY_KEYS } from './memory.js';
 import * as learner from './learn.js';
@@ -109,6 +109,9 @@ const withSources = (spec, sources) =>
   !sources?.length || spec.blocks.some((b) => b.type === 'sources')
     ? spec
     : validateSpec({ ...spec, blocks: [...spec.blocks, { type: 'sources', items: sources }] }) || spec;
+
+// The tool result: the instruction sentence, then what the page shows now.
+const withSummary = (sentence, spec) => (spec ? `${sentence}. Page now shows: ${pageSummary(spec)}` : sentence);
 
 const designOf = (design) => (typeof design === 'string' && design.trim() ? { design: design.trim().slice(0, 600) } : {});
 
@@ -251,14 +254,16 @@ function createScreenHandlers(ui, learn) {
         const kept = ui.saved?.()[parsed.saved];
         if (!kept) return `error: no kept page "${parsed.saved}"; draw a new page with a full spec`;
         await ui.openScene('generated', { savedKind: kept.kind });
-        return `reopened the kept page "${kept.name || kept.kind}"; say it is ready, do not ask if they like it`;
+        // The page as it reopened (items reset), else as it was kept.
+        const shown = generated()?.ctl.state?.().spec || validateSpec(kept.spec);
+        return withSummary(`reopened the kept page "${kept.name || kept.kind}"; say it is ready, do not ask if they like it`, shown);
       }
       let spec = validateSpec(parsed);
       if (!spec) return 'error: spec has no usable blocks; use only the fixed components';
       passedOver();
       await ui.openScene('generated', { spec, ...(spec.urgency === 'none' ? designOf(design) : {}) });
       if (spec.urgency === 'none') offered = { spec };
-      return spec.urgency === 'none' ? 'page shown; now ask if the user likes it and propose one or two changes' : 'first-aid page shown';
+      return withSummary(spec.urgency === 'none' ? 'page shown; now ask if the user likes it and propose one or two changes' : 'first-aid page shown', spec);
     },
 
     revise_ui({ spec_json, design } = {}) {
@@ -273,7 +278,7 @@ function createScreenHandlers(ui, learn) {
       // Learn what the user asked to change, for the next page like it.
       learn.noteRevise(before, spec);
       offered = null;
-      return 'page redrawn';
+      return withSummary('page redrawn', spec);
     },
 
     mark_urgent({ level } = {}) {

@@ -53,6 +53,8 @@ function makeAgent(token) {
       sendText(`[scene event] ${text}`);
     },
     close: () => alive() && closeScene(),
+    // A silent note to the live agent (the user changed the page by hand); nothing offline.
+    tell: (text) => alive() && live.connected && sendContext(text),
   };
 }
 

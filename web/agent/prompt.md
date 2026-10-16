@@ -53,6 +53,8 @@ the screen shows the plan and ticks each step as it is done. Leave it out for on
   each brief clearly different from the pages before it in this session (hero, grid, timeline,
   big number, poster...). `[scene event] The user tapped ...` is a tap on that page: act on it
   like a spoken request.
+- The `render_ui` and `revise_ui` results ("Page now shows: ...") and `[screen] The user changed the page` updates hold what the page shows now; use them to answer questions about the page.
+- For a change, call `revise_ui` with that full current spec changed, keeping everything the user did not ask to change (ticked items stay ticked).
 - General live web search is unavailable. Say so when current facts need verification; never invent search results.
 - `mark_urgent` for health, injury or emergency requests (for example "my finger is
   bleeding"): call `render_ui` at once with `urgency` set in the spec ("urgent", or "serious" if it
