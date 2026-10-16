@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { home, expectHome } from './helpers.js';
+import { home, expectHome, say } from './helpers.js';
 
 // The memory page: the user sees and controls what the agent remembers on this phone.
 // SHOTS=1 also saves the seeded page to tests/screenshots/ for the pull request.
@@ -27,8 +27,9 @@ const stored = (page) => page.evaluate(() => ({
   saved: Object.keys(JSON.parse(localStorage.getItem('agentos.savedScenes') || '{}')),
 }));
 
+// No button on the home screen: the user asks the agent for it.
 async function openFromHome(page) {
-  await page.getByTestId('memory-entry').click();
+  await say(page, 'agent จำอะไรไว้');
   await expect(page.locator('body')).toHaveAttribute('data-scene', 'memory');
   return page.locator('#stage .scene-memory');
 }
@@ -36,7 +37,7 @@ async function openFromHome(page) {
 test('memory page: edit a fact, forget a learned line, remove a kept page, then forget everything', async ({ page }) => {
   await seed(page);
   await home(page);
-  await expect(page.getByTestId('memory-entry')).toContainText('What I remember');
+  await expect(page.getByTestId('memory-entry')).toHaveCount(0);
   const scene = await openFromHome(page);
 
   const facts = scene.getByTestId('mem-facts');
@@ -113,7 +114,9 @@ export const Conversation = { async startSession(opts) {
   await expect(page.locator('body')).toHaveAttribute('data-brain', 'agent');
   await page.locator('#mic').dispatchEvent('pointerup');
 
-  const scene = await openFromHome(page);
+  // The live agent has no tool for the memory page yet: open it the way the presenter hotkey m does.
+  await page.evaluate(() => window.agentOS.openScene('memory'));
+  const scene = page.locator('#stage .scene-memory');
   const context = () => page.evaluate(() => window.__conv.context.filter((t) => t.includes('changed what you remember')));
   await scene.getByTestId('forget-likes').click();
   await expect.poll(context).toEqual(['[screen] The user changed what you remember: forgot likes.']);
@@ -127,10 +130,6 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 
     await page.setViewportSize(viewport);
     await seed(page);
     await home(page);
-    const entry = page.getByTestId('memory-entry');
-    await entry.scrollIntoViewIfNeeded();
-    const [entryBox, subtitle] = [await entry.boundingBox(), await page.locator('#subtitle').boundingBox()];
-    expect(entryBox.y + entryBox.height).toBeLessThanOrEqual(subtitle.y);
     const scene = await openFromHome(page);
     await scene.getByTestId('edit-btn-name').click(); // the widest row: an open edit field
     await page.waitForTimeout(800); // the scene has finished growing
