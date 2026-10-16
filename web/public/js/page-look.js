@@ -65,7 +65,10 @@ export function colourName(rgb) {
 
 // Colourful enough to be an accent (not white, black or a grey).
 const vivid = (rgb) => Math.max(...rgb) - Math.min(...rgb) >= 60;
-const quote = (s) => `"${String(s).replace(/\s+/g, ' ').trim().slice(0, 30)}"`;
+const quote = (s) => {
+  const t = String(s).replace(/\s+/g, ' ').trim();
+  return `"${t.length > 30 ? `${t.slice(0, 29)}…` : t}"`;
+};
 const area = (r) => Math.max(0, r.width) * Math.max(0, r.height);
 
 export function describePage(boxes, viewport, fails = []) {

@@ -333,6 +333,8 @@ test('layout check: a model page that overlaps and drops an item goes back to th
   const context = await page.evaluate(() => window.__conv.context.join('\n'));
   expect(context).toContain('[screen] The designed page was replaced by the simple page because: overlap: ');
   expect(context).toContain('missing: item "แว่นกันแดด"');
+  expect(context).not.toContain('looks like');
+  expect(await tool(page, 'inspect_page', {})).toMatch(/^the simple block page is showing: .*layout check failed: overlap: .*missing: item "แว่นกันแดด"/);
   expect(await page.evaluate(() => window.__conv.sent.join('\n'))).not.toContain('replaced');
   await page.waitForTimeout(300);
   expect(calls).toHaveLength(1); // no retry
@@ -354,4 +356,21 @@ test('layout check: a clean model page stays, and a kept page reopens as the mod
   await expect(scene(page)).toHaveAttribute('data-view', 'html');
   expect(await pageChecks(page)).toEqual([]);
   expect(calls).toHaveLength(1);
+});
+
+test('live: a clean model page sends a silent note of how it looks; inspect_page measures it again', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await stubPage(page, packPage(PACK.blocks[0].items.map((i) => i.text)));
+  await liveHome(page);
+  expect(await tool(page, 'inspect_page', {})).toBe('error: no generated page is open');
+  await tool(page, 'render_ui', { spec_json: JSON.stringify(PACK), design: 'Beach packing list' });
+  await expect(scene(page)).toHaveAttribute('data-view', 'html');
+  const context = () => page.evaluate(() => window.__conv.context.join('\n'));
+  await expect.poll(context).toContain('[screen] The designed page looks like: Top to bottom: heading "จัดกระเป๋าไปทะเล"');
+  const look = await tool(page, 'inspect_page', {});
+  expect(look).toMatch(/^Top to bottom: heading "จัดกระเป๋าไปทะเล", text "ของที่ต้องเอาไปเที่ยวทะเลวันเ…", list of 3 items\./);
+  expect(look).toMatch(/Background white/);
+  expect(look).toMatch(/Text \d+ to 32 px\./);
+  expect(look).toMatch(/Layout check: passed$/);
+  expect(await page.evaluate(() => window.__conv.sent.join('\n'))).not.toContain('looks like');
 });

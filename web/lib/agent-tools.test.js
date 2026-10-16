@@ -93,6 +93,21 @@ test('mark_urgent and keep_scene: first-aid pages are never kept', async () => {
   assert.match(h2.keep_scene(), /^refused/);
 });
 
+test('inspect_page: returns what the open page measures now; no generated page is an error', () => {
+  const look = 'Top to bottom: heading "Beach day", button "Book now". Fits one screen. Background white, accent blue. Text 16 to 40 px. Layout check: passed';
+  let measured = 0;
+  const open = { name: 'generated', ctl: { inspect: () => { measured += 1; return look; } } };
+  const h = createToolHandlers(fakeUi(open).ui);
+  assert.equal(h.inspect_page(), look);
+  assert.equal(h.inspect_page(), look);
+  assert.equal(measured, 2); // measured again on each call
+  const blocks = { name: 'generated', ctl: { inspect: () => 'the simple block page is showing: the designed page was replaced because its layout check failed: overlap: "a" and "b"' } };
+  assert.match(createToolHandlers(fakeUi(blocks).ui).inspect_page(), /block page is showing.*overlap: "a" and "b"/);
+  assert.equal(createToolHandlers(fakeUi({ name: 'flight', ctl: {} }).ui).inspect_page(), 'error: no generated page is open');
+  assert.equal(createToolHandlers(fakeUi().ui).inspect_page(), 'error: no generated page is open');
+  assert.deepEqual(TOOL_DEFS.find((t) => t.name === 'inspect_page').params, {});
+});
+
 test('kept pages: the note lists name, words and reference; render_ui reopens one by its reference', async () => {
   const saved = { todo: { kind: 'todo', name: 'To-do list', match: ['todo', 'to-do'], spec: cannedTodo() } };
   assert.equal(keptPagesNote({}), '');
