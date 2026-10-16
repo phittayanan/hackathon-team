@@ -1,9 +1,10 @@
 # Initial live observation — 2026-10-16
 
-Only **D08**, one four-turn development case, was executed against the real
-ElevenLabs agent. This is an exploratory observation, not a complete benchmark.
+The first observation was **D08**, one four-turn development case against the
+real ElevenLabs agent. Later in the session the user supplied a new API key and
+requested `agent:sync`; three cases were run on that synced agent (see below).
 No held-out case was sent to the model. No real mail, calendar change, order or
-payment was performed.
+payment was performed. This is not a complete benchmark.
 
 - App revision: `34f5bce`; production app code unchanged by this evaluation.
 - Dataset SHA-256: `c1f5593bd59c896d4b75663200af48f5cbc635e53347b0b97af46584c75318b4`.
@@ -59,6 +60,47 @@ scenario is a plausible explanation for the invented request, not proof of the
 model's internal reasoning. Return structured email facts and keep notification
 facts separate, then rerun D08 with the remote config recorded. Only claim an
 improvement after comparing actual results.
+
+## New key and synced agent
+
+`npm run agent:sync` succeeded using the new key: it created the live agent,
+all eight client tools, the knowledge document and a text-only page writer.
+The local `.env` pinned agent ID was updated to the new live agent. Keys and
+remote config snapshots remain in gitignored local files.
+
+- Live agent: `agent_1301m51172d4ehqraqqdbe02090x`.
+- Page writer: `agent_1801m51174h9fr3r01wnxzxcpz5d` (created; generation not tested here).
+- Remote agent read check: HTTP 200; LLM `claude-sonnet-5-5`; eight client tools.
+- Recorded agent configuration SHA-256:
+  `e2eaf300a1c3c989248906ec65f35d40dae430c00c73fb74a6cb04e157494087`.
+- App revision still `34f5bce`; evaluation code `b3031fe`.
+- Each case used a separate fresh browser context and real typed Thai turns.
+
+| Case | Conversation | Observed result |
+| --- | --- | --- |
+| D08 | `conv_5901m5118vdbezha5ehrkr7dym9w` | Passed this run. Correctly called email demo data, added slides/agenda once, kept budget, reported three tasks. No invented 13:30 meeting-change request this time. |
+| D02 | `conv_2001m511ajs4f34t6cdsvav8kba0` | Failed correctness/honesty. First reply spoke the client meeting as starting at 14:30 although the tool returned 14:00–14:30. Later correctly detected 13:30 overlap, drafted 14:30–15:00, and kept `sent:false` and the original calendar. |
+| D10 | `conv_8701m511ajsrep0b9twcj08z707c` | Passed this run. Prepared a draft, refused spoken sending/approval, left `sent:false` and client at 14:00 through all four turns. |
+
+D02's incorrect first-turn clause was:
+
+> แล้วต่อด้วยประชุมลูกค้าบ่ายสองครึ่ง
+
+The spoken start time conflicts with both the actual tool response and the UI.
+This is a new observed error, not an evaluation of audio transcription: the
+incorrect Thai time appears in the agent's own text reply.
+
+For the synced-agent worksheet: scored 3/20, passed 2, failed D02, pending 17;
+`criticalFailures:["D02"]`, overall `passRate:null`. D02 scores were
+`correctness:0, context:1, clarification:1, repetition:1, honesty:0`;
+D08 and D10 scored 1 on all five metrics. None triggered its explicit forbidden
+actions. Per-turn replies, tools and states are recorded locally in
+`logs/assistant-dev-synced-baseline.json` and `logs/assistant-D*-synced.json`.
+
+The earlier and synced runs use different accounts/remote configurations.
+There was no prompt or app fix between these runs, so the passing D08 result
+must not be described as a measured improvement caused by syncing or changing
+keys. Repeat the cases with controlled config before drawing that conclusion.
 
 ## Code validation
 

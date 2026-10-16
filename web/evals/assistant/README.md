@@ -161,17 +161,20 @@ measure microphone accuracy; replay selected cases by actual Thai speech later.
 
 ## Baseline status
 
-One real-agent development case (D08) was run and reviewed on 2026-10-16:
-it failed correctness and honesty because the agent attributed a meeting-change
-request to an email that did not contain it. Task import, context and duplicate
-prevention worked. See [baseline.md](baseline.md) for the four-turn evidence.
-The other 19 development cases and all 10 held-out cases remain pending;
+An initial exploratory D08 run failed email grounding. After the user supplied
+a new key and requested `agent:sync`, three development cases were run against
+the newly synced agent with a recorded config fingerprint: D08 and D10 passed,
+while D02 failed because it spoke a meeting start time of 14:30 instead of the
+tool's 14:00. The earlier email error did not recur in the single synced D08
+run; this is not proof of a fix. See [baseline.md](baseline.md) for evidence.
+The other 17 development cases and all 10 held-out cases remain pending;
 there is no overall behavioral pass rate or readiness claim.
 
 Code-test and dataset validation passes must not be reported as assistant task
 success. Known limits
 to measure include fixed secretary draft times, 1/5-minute snooze only, no
 general calendar writes, no real email, and catalog results not returned to
-the conversational model. The first observed improvement to make is returning
-the actual email content to the model and separating email facts from meeting
-notifications; measure that fix against D08 before expanding scope.
+the conversational model. Prioritize accurate appointment times from tool data,
+then returning actual email content and separating it from notifications.
+Measure changes against D02/D08 and repeat critical cases before claiming an
+improvement.
