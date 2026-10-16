@@ -87,11 +87,13 @@ export function healthNote(data = {}) {
 }
 
 // The [screen] note for a page that is open when a new live session starts; '' on the home.
-// current: { name, ctl } from the app; generated pages use the page summary (genui.js).
+// current: { name, ctl } from the app; generated pages use the page summary (genui.js) and their versions.
 export function openPageNote(current) {
   if (!current?.name) return '';
   const summary = current.name === 'generated' ? pageSummary(current.ctl?.state?.()?.spec) : current.ctl?.summary?.();
-  return `[screen] The ${current.name} page is open${summary ? `: ${clip(summary)}` : '.'}`;
+  // A generated page also names its earlier versions, so a new session can still refer to them.
+  const versions = current.name === 'generated' ? current.ctl?.history?.() || '' : '';
+  return `[screen] The ${current.name} page is open${summary ? `: ${clip(summary)}` : '.'}${versions ? ` ${versions}` : ''}`;
 }
 
 // The places page: what the agent may say about the search. Coordinates are never included.

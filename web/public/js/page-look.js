@@ -70,8 +70,18 @@ const quote = (s) => {
   return `"${t.length > 30 ? `${t.slice(0, 29)}…` : t}"`;
 };
 const area = (r) => Math.max(0, r.width) * Math.max(0, r.height);
+const hex = (rgb) => `#${rgb.map((n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0')).join('')}`;
+export const MAX_PALETTE = 5;
 
 export function describePage(boxes, viewport, fails = []) {
+  return describeLook(boxes, viewport, fails).text;
+}
+
+// The same look as facts too, for the page's version history (page-history.js):
+// { text, background, accent ('none' when there is none), sections: ['heading "…"', …], palette }.
+// palette: the most used colours as '#rrggbb', from the computed styles, so named, hsl() and var()
+// colours count as the browser painted them.
+export function describeLook(boxes, viewport, fails = []) {
   const shown = boxes.map((b) => !isHidden(b, viewport));
   const kids = boxes.map(() => []);
   boxes.forEach((b, i) => {
@@ -125,6 +135,18 @@ export function describePage(boxes, viewport, fails = []) {
     if (fg && vivid(fg) && chars) weight.set(colourName(fg), (weight.get(colourName(fg)) || 0) + chars * (x.fontSize || 16) ** 2);
   });
   weight.delete(colourName(back));
+  // Every painted colour, greys included, weighted the same way; the page background counts as the whole frame.
+  const used = new Map();
+  const use = (rgb, w) => {
+    if (rgb && w > 0) used.set(hex(rgb), (used.get(hex(rgb)) || 0) + w);
+  };
+  use(back, Math.max(1, viewport.width * viewport.height));
+  boxes.forEach((x, i) => {
+    if (!shown[i]) return;
+    use(parseColour(x.background), area(x.rect));
+    if (x.text.trim()) use(parseColour(x.color), x.text.trim().length * (x.fontSize || 16) ** 2);
+  });
+  const palette = [...used].sort((p, q) => q[1] - p[1]).slice(0, MAX_PALETTE).map(([c]) => c);
   const accent = [...weight].sort((p, q) => q[1] - p[1])[0]?.[0];
   const sizes = boxes.filter((x, i) => shown[i] && x.text.trim() && x.fontSize > 0).map((x) => Math.round(x.fontSize));
 
@@ -139,5 +161,6 @@ export function describePage(boxes, viewport, fails = []) {
   const room = MAX_LOOK_CHARS - rest.length - 1;
   if (sections.length > room) sections = `${sections.slice(0, Math.max(0, room - 1)).trimEnd()}…`;
   const out = `${sections} ${rest}`;
-  return out.length > MAX_LOOK_CHARS ? `${out.slice(0, MAX_LOOK_CHARS - 1)}…` : out;
+  const text = out.length > MAX_LOOK_CHARS ? `${out.slice(0, MAX_LOOK_CHARS - 1)}…` : out;
+  return { text, background: colourName(back), accent: accent || 'none', sections: listed, palette };
 }

@@ -9,7 +9,11 @@
 // page has painted (and when a kept page reopens), its boxes are measured and checked (page-check.js):
 // any failure brings the block page back, logs one [page check] line and tells the live agent silently.
 // A page that passes is described (page-look.js) in a silent note, so the agent knows how it looks;
-// inspect() measures it again on demand (the inspect_page tool).
+// inspect() measures it again on demand (the inspect_page tool). Each version of the page (first draw,
+// then every revise) is kept in memory with its brief, look and colours (page-history.js): the agent
+// can point at an earlier one, and a revise sends the page writer the current look (and the earlier
+// version the agent named) so the page changes only where the brief asks.
+// The page writer is told the page area's size: the app is a phone screen (a 390 px frame on a laptop).
 // The agent asks if the user likes it; spoken answers revise the spec and it redraws in place.
 // A page the user likes can be kept as a saved scene in localStorage (with its HTML, if it had one).
 import { T } from '../timing.js';
@@ -18,14 +22,15 @@ import { sanitizePage, sanitizePartial, pageOk } from '../page-sanitize.js';
 import { applyStyle, styleText } from '../style.js';
 import { changeNote, markDone } from '../genui.js';
 import { checkPage, failureText } from '../page-check.js';
-import { describePage } from '../page-look.js';
+import { describeLook } from '../page-look.js';
+import { addVersion, historyText, referenceOf } from '../page-history.js';
 import { logEvent } from '../log.js';
 
 // The browser waits a little longer than the server's own 12 s limit (lib/page-model.js).
 const PAGE_WAIT_MS = 14_000;
 // Base styles inside the shadow root; the app's colour tokens (--ink, --accent...) inherit into it.
 const PAGE_CSS =
-  ':host{display:block;contain:layout paint;position:relative;overflow:hidden;border-radius:var(--radius);background:var(--cream)}' +
+  ':host{display:block;contain:layout paint;container-type:inline-size;position:relative;overflow:hidden;border-radius:var(--radius);background:var(--cream)}' +
   '.pg-body{font-family:var(--font);color:var(--ink);line-height:1.5;min-height:100%;overflow-wrap:anywhere}' +
   '.pg-body *{box-sizing:border-box}.pg-body img,.pg-body svg{max-width:100%;height:auto}' +
   '[data-action],[data-toggle],[data-count-step]{cursor:pointer}';
@@ -283,8 +288,18 @@ function measurePage(host) {
   const own = getComputedStyle(body);
   const frameCss = getComputedStyle(host);
   const background = `${own.backgroundColor} ${own.backgroundImage} ${frameCss.backgroundColor}`;
-  return { boxes, viewport: { width: host.clientWidth, height: window.innerHeight, contentWidth: body.scrollWidth, background } };
+  // Height: what the scene shows at once (the phone screen), not the browser window.
+  const height = host.closest('.scene')?.clientHeight || window.innerHeight;
+  return { boxes, viewport: { width: host.clientWidth, height, contentWidth: body.scrollWidth, background } };
 }
+
+// The page area the page writer designs for: the scene's inner width and visible height, in CSS px.
+function pageArea(el) {
+  const css = getComputedStyle(el);
+  const width = Math.round(el.clientWidth - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0));
+  return { width, height: Math.round(el.clientHeight) };
+}
+const areaText = ({ width, height }) => `Phone screen, page area ${width}x${height} px, ${height >= width ? 'portrait' : 'landscape'}.`;
 
 // The spec for the page model: sources stay with the app, which draws them as real links.
 const withoutSources = (spec) => ({ ...spec, blocks: spec.blocks.filter((b) => b.type !== 'sources') });
@@ -318,6 +333,12 @@ export default function mountGenerated(el, data, agent) {
   let host = null;
   let pending = null;
   let lastFailure = ''; // the last layout check failure, for inspect() while the block page shows
+  // This page's versions (page-history.js); the last one is on screen.
+  let versions = addVersion([], { brief: design, accent: spec.accent, view: pageRaw ? 'html' : design && !urgent ? 'pending' : 'blocks' });
+  const current = () => versions.at(-1);
+  // Sent with the next page request: the look being changed, and an earlier version the agent named.
+  let base = null;
+  let reference = null;
 
   // The user changed the page by hand: tell the live agent (app.js sends nothing offline).
   const tell = (change) => agent.tell?.(changeNote(change, spec));
@@ -339,7 +360,7 @@ export default function mountGenerated(el, data, agent) {
     if (!measured) return null;
     // Checked against what the page model got: it never sees the sources.
     const fails = checkPage(measured.boxes, measured.viewport, withoutSources(spec));
-    return { fails, text: describePage(measured.boxes, measured.viewport, fails) };
+    return { fails, ...describeLook(measured.boxes, measured.viewport, fails) };
   };
 
   // The finished model page on screen passes the layout checks: a silent note says how it looks.
@@ -352,7 +373,11 @@ export default function mountGenerated(el, data, agent) {
     const { fails } = seen;
     if (!fails.length) {
       lastFailure = '';
-      agent.tell?.(`[screen] The designed page looks like: ${seen.text}`);
+      const now = current();
+      now.view = 'html';
+      now.look = { background: seen.background, accent: seen.accent, sections: seen.sections };
+      now.palette = seen.palette;
+      agent.tell?.(`[screen] The designed page (v${now.v}) looks like: ${seen.text}`);
       return true;
     }
     const why = failureText(fails);
@@ -438,7 +463,7 @@ export default function mountGenerated(el, data, agent) {
       const res = await apiFetch('/api/page', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ spec: withoutSources(spec), design, style: styleText() }),
+        body: JSON.stringify({ spec: withoutSources(spec), design, style: styleText(), screen: pageArea(el), base, reference }),
         signal: stop.signal,
       });
       if (!res.ok || !res.body) throw new Error(`page http ${res.status}`);
@@ -471,6 +496,7 @@ export default function mountGenerated(el, data, agent) {
     } catch (err) {
       if (pending !== stop) return;
       console.info('[page] block page kept:', err.message);
+      current().view = 'blocks';
       pageRaw = null;
       shown = null;
       if (view !== 'blocks') setView('blocks');
@@ -485,6 +511,7 @@ export default function mountGenerated(el, data, agent) {
     nextFrame().then(() => {
       if (!pageRaw || pageFits()) return;
       console.info('[page] block page kept: kept page failed the layout check');
+      current().view = 'blocks';
       pageRaw = null;
       shown = null;
       setView('blocks');
@@ -496,6 +523,8 @@ export default function mountGenerated(el, data, agent) {
 
   return {
     state: () => ({ spec, stage: stage === 'saved' ? 'review' : stage }),
+    // The versions of this page and how each looked, for the live agent (revise_ui result, session start).
+    history: () => historyText(versions),
     // How the page looks now, for the inspect_page tool. Measurement only.
     inspect() {
       if (view === 'blocks') {
@@ -505,7 +534,8 @@ export default function mountGenerated(el, data, agent) {
       }
       const seen = look();
       if (!seen) return 'error: the page could not be measured';
-      return view === 'partial' ? `the designed page is still being written; so far: ${seen.text}` : seen.text;
+      const area = areaText(pageArea(el));
+      return view === 'partial' ? `${area} The designed page is still being written; so far: ${seen.text}` : `${area} ${seen.text}`;
     },
     destroy() {
       pending?.abort();
@@ -523,14 +553,20 @@ export default function mountGenerated(el, data, agent) {
         urgent = true;
         stage = 'urgent';
         version += 1;
+        versions = addVersion(versions, { accent: spec.accent, view: 'blocks' });
         draw(true);
         return;
       }
       if (urgent && action !== 'close') return;
       if (action === 'revise' && res.spec) {
         // The changed spec shows as blocks at once; a new model page follows if there is a brief.
+        // The page writer gets the look being changed, and the earlier version the agent named.
+        if (current().view === 'pending') current().view = 'blocks'; // its page is dropped unfinished
+        base = referenceOf(current());
+        reference = res.like ? referenceOf(versions.find((x) => x.v === res.like)) : null;
         spec = res.spec;
         if (res.design) design = res.design;
+        versions = addVersion(versions, { brief: design, accent: spec.accent, view: design ? 'pending' : 'blocks' });
         pageRaw = null;
         shown = null;
         view = 'blocks';

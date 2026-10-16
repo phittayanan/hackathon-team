@@ -121,6 +121,10 @@ flowchart LR
   attributes, `javascript:` URLs, forms, iframes or outside loads except
   pictures), then shown in a shadow root. If the page looks broken, the
   block page stays. Pictures come from a fixed set in `web/public/pics/`.
+  The page writer is told the page area (a phone screen, a 390 px frame on a
+  laptop). Each version of a page is kept in the browser with its brief,
+  look and colours: a revise sends the page writer the current look, and the
+  agent can point at an earlier version ("the colours of the first one").
 - **Server** (`web/server.js` locally, `web/api/` on Vercel, shared code in
   `web/lib/`): signed URL, text to speech, page writer, product and places
   search, the offline keyword router and the run log. Every route that

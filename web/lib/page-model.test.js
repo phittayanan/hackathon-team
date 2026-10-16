@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { streamPage, pagePrompt, SYSTEM_PROMPT, PICTURES } from './page-model.js';
+import { streamPage, pagePrompt, cleanPageExtras, SYSTEM_PROMPT, PICTURES } from './page-model.js';
 import { createHandlers, HttpError } from './handlers.js';
 import { createAccounts } from './accounts.js';
 import { createUsage, memoryStore } from './usage.js';
@@ -97,7 +97,7 @@ test('streamPage: out of credit (signed URL or a quota close before the start) i
 });
 
 test('the prompts: varied layouts, app tokens, Thai first, 44 px, AA, app pictures, data-action', () => {
-  for (const want of ['Make every page look different', '--accent', 'Thai text first', '44 px', 'WCAG AA', 'data-action', 'data-toggle', 'data-count', 'No <script>']) {
+  for (const want of ['A new page: make it look different', 'A change (the request has "Current page")', 'No @media queries', '@container', '--accent', 'Thai text first', '44 px', 'WCAG AA', 'data-action', 'data-toggle', 'data-count', 'No <script>']) {
     assert.ok(SYSTEM_PROMPT.includes(want), want);
   }
   for (const path of Object.keys(PICTURES)) assert.ok(SYSTEM_PROMPT.includes(path));
@@ -176,4 +176,29 @@ test('/api/page: the style line reaches the page writer; only a string, cut to 2
   assert.match(await userText('z'.repeat(400)), new RegExp(`User's design system: z{200}\\n`));
   assert.ok(!(await userText({ size: 'large' })).includes("User's design system"));
   assert.ok(!(await userText(undefined)).includes("User's design system"));
+});
+
+test('pagePrompt: the phone page area, the page being changed and the earlier version the user points at', () => {
+  const extras = cleanPageExtras({
+    screen: { width: 346, height: 690.4 },
+    base: { v: 3, look: 'background cream, accent orange', palette: ['#ff7a59', 'red; }', '#F6EFE4'], brief: 'Orange poster' },
+    reference: { v: 1, look: 'list of 2 items; background cream, accent blue', palette: ['#2b6be0'] },
+  });
+  assert.deepEqual(extras.screen, { width: 346, height: 690 });
+  assert.deepEqual(extras.base.palette, ['#ff7a59', '#F6EFE4']);
+  const p = pagePrompt(SPEC, 'The colours of v1, this layout', '', extras);
+  assert.match(p, /^Page area: 346x690 px on a phone screen, portrait\.$/m);
+  assert.match(p, /^Current page \(this request changes it\): looks like: background cream, accent orange; colours: #ff7a59, #F6EFE4; its brief was: Orange poster$/m);
+  assert.match(p, /^Earlier version v1 the user points at: looks like: list of 2 items; background cream, accent blue; colours: #2b6be0$/m);
+  // A first page sends none of these.
+  assert.ok(!/Page area|Current page|Earlier version/.test(pagePrompt(SPEC, 'Bold poster')));
+});
+
+test('cleanPageExtras: what the browser sends is checked and cut', () => {
+  assert.deepEqual(cleanPageExtras({}), { screen: null, base: null, reference: null });
+  assert.deepEqual(cleanPageExtras({ screen: { width: 'wide', height: 900 } }).screen, null);
+  assert.deepEqual(cleanPageExtras({ screen: { width: 90000, height: 900 } }).screen, null);
+  assert.equal(cleanPageExtras({ base: { look: '' } }).base, null);
+  const long = cleanPageExtras({ base: { v: -1, look: 'z'.repeat(900), palette: 'red', brief: 7 } }).base;
+  assert.deepEqual(long, { v: null, look: 'z'.repeat(300), palette: [], brief: '' });
 });

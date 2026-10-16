@@ -119,8 +119,10 @@ search for `[runlog]`.
 
 Each line records one event with a millisecond time: what the user said,
 typed or tapped; what the agent replied; every tool call; every voice start
-and end, with its source; scenes opening and closing; feed events; limit and
-offline switches; errors.
+and end, with its source; scenes opening and closing; live agent sessions
+starting and ending (`live_start`, `live_end`: a new session has no memory of
+the last conversation); layout checks that failed (`page_check`); feed
+events; limit and offline switches; errors.
 
 ```text
 npm run log:check                                   # the latest run
