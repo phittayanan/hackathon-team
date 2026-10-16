@@ -6,6 +6,7 @@ import { plan as screenPlan } from './plan.js';
 import { remember as keepFact, forgetMemory, MEMORY_KEYS } from './memory.js';
 import * as learner from './learn.js';
 import { resetStyle } from './style.js';
+import { videoQueryFromRequest } from './youtube-search.js';
 
 export const PROACTIVE_SCENES = ['shopping', 'payment', 'flight', 'training'];
 const SECRETARY_ACTIONS = ['today', 'email', 'add_tasks', 'draft', 'acknowledge', 'snooze'];
@@ -33,6 +34,16 @@ const DESIGN_PARAM = {
 // Parameters are kept flat (strings and enums) so any tool schema format can carry them;
 // structured data travels as a JSON string.
 export const TOOL_DEFS = [
+  {
+    name: 'search_videos',
+    description:
+      'Find tutorial videos by opening YouTube search results. Use when the user asks to find, recommend, or watch a video/tutorial. ' +
+      'Pass concise search terms in the user\'s language; for Rubik\'s Cube tutorials use spelling "Rubik\'s Cube". ' +
+      'This opens YouTube results in a new tab; it does not fetch or rank individual videos. Never claim you watched or verified a specific video.',
+    params: {
+      query: { type: 'string', description: 'Concise video search terms, 2 to 160 characters', required: true },
+    },
+  },
   {
     name: 'secretary_action',
     description: 'Personal secretary DEMO with sample data only. today = today tasks and calendar; email = sample client email; add_tasks = import its two tasks once; draft = prepare editable reply proposing 14:30 (13:30 conflicts with team meeting); acknowledge or snooze = act on displayed notifications. Returns current sample data. No real mail or calendar changes. Sending requires the owner tapping the test-send button; no tool can send.',
@@ -132,7 +143,7 @@ const parseJson = (text) => {
 const NO_BLOCKS = 'error: spec has no usable blocks; write each block as {"type":"<block type>", ...fields}, ' +
   'for example {"type":"checklist","items":[{"text":"...","done":false}]}, using only the fixed block types';
 
-const STEP_TOOLS = ['open_scene', 'scene_action', 'render_ui', 'revise_ui', 'keep_scene'];
+const STEP_TOOLS = ['open_scene', 'scene_action', 'render_ui', 'revise_ui', 'keep_scene', 'search_videos'];
 const FAILED = /^(error|refused|no results|no page)/;
 const SCENE_TASKS = {
   shopping: 'groceries list from the weekly email',
@@ -141,6 +152,7 @@ const SCENE_TASKS = {
   training: '10K training plan and race sign-up',
 };
 export function lastTask(name, params = {}) {
+  if (name === 'search_videos') return `searched YouTube videos: ${String(params.query || '').slice(0, 80)}`;
   if (name === 'open_scene' && params.scene === 'shopping' && parseJson(params.data_json)?.catalog === true) return 'product discovery through Shopify';
   if (name === 'open_scene') return SCENE_TASKS[params.scene] || null;
   if (name === 'render_ui') {
@@ -222,6 +234,12 @@ function createScreenHandlers(ui, learn) {
   };
 
   return {
+    async search_videos({ query } = {}) {
+      const result = videoQueryFromRequest(query);
+      if (!result) return 'error: provide a video search query of at least 2 characters';
+      await ui.openScene('video-search', { query: result.query });
+      return `opened YouTube search results for "${result.query}"; tell the user to choose a video from the results; no individual video was fetched or verified`;
+    },
     secretary_action({ action, minutes = '1' } = {}) {
       if (!SECRETARY_ACTIONS.includes(action) || (action === 'snooze' && !['1', '5'].includes(minutes))) return 'error: invalid secretary action';
       if (!ui.secretary) return 'error: secretary unavailable';

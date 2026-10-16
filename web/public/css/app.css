@@ -644,3 +644,14 @@ html[lang="th"] .phone :is(h1, h2, h3, b, strong, button, label, select, .eyebro
 .style-reset .mem-btn:disabled { opacity: .55; cursor: default; filter: none; }
 #stage .scene-memory .style-choice:focus-visible, #stage .scene-memory .style-reset .mem-btn:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) { .style-choice { transition: none; } }
+
+/* YouTube tutorial search scene. */
+.scene-video-search { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; padding: 28px 20px; }
+.video-search-title { margin: 0; font-size: clamp(24px, 7vw, 32px); letter-spacing: -.03em; }
+.video-search-query { max-width: 100%; margin: 0; overflow-wrap: anywhere; color: var(--ink-2); font-size: 16px; }
+.video-search-note { margin: 0; color: var(--ink-2); font-size: 14px; }
+.video-search-link, .video-search-close { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 10px 20px; border: 1px solid var(--glass-border); border-radius: 999px; font: 600 15px var(--font); text-decoration: none; cursor: pointer; }
+.video-search-link { color: #fff; background: linear-gradient(150deg, #a182c7e0, #7652a2e6 50%, #4d3076f0); box-shadow: var(--glass-shadow); }
+.video-search-close { color: #38254f; background: var(--glass-surface); box-shadow: var(--glass-shadow); }
+.video-search-link:focus-visible, .video-search-close:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 3px; }
+@media (prefers-reduced-motion: no-preference) { .video-search-link, .video-search-close { transition: transform .2s ease, filter .2s ease; } .video-search-link:hover, .video-search-close:hover { transform: translateY(-1px); filter: brightness(1.05); } }

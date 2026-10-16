@@ -48,6 +48,16 @@ test('open_scene checks the scene and the JSON', async () => {
   assert.deepEqual(log[0], ['open', 'flight', { delayMinutes: 90 }]);
 });
 
+test('search_videos opens only a validated YouTube results URL and reports its limits', async () => {
+  const { ui, log } = fakeUi();
+  const h = createToolHandlers(ui);
+  assert.match(await h.search_videos({ query: 'x' }), /^error/);
+  assert.equal(log.length, 0);
+  const out = await h.search_videos({ query: 'rubric' });
+  assert.match(out, /no individual video was fetched or verified/);
+  assert.deepEqual(log.at(-1), ['open', 'video-search', { query: "Rubik's Cube" }]);
+});
+
 test('open_scene returns the open scene\'s summary so the agent knows its facts', async () => {
   const ui = { current: () => ({ name: 'payment', ctl: { summary: () => 'Payment request to FreshMart Online, total ฿849.' } }), openScene: () => {} };
   assert.equal(await createToolHandlers(ui).open_scene({ scene: 'payment' }), 'opened payment: Payment request to FreshMart Online, total ฿849.');

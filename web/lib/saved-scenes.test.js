@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 // generated.js reads location when it loads (through its imports), so stub it first.
 globalThis.location ??= { search: '', href: 'http://localhost/' };
+globalThis.window ??= { addEventListener() {} };
 const { loadSaved, removeSaved, savedIndex } = await import('../public/js/scenes/generated.js');
 
 const STORE = 'agentos.savedScenes';

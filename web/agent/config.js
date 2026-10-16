@@ -44,7 +44,7 @@ export function toolConfigs() {
       response_timeout_secs: 10,
       // Say what you are about to do before a scene grows or changes.
       // A page revise takes the model a few seconds: a short sentence first keeps it feeling quick.
-      ...(['open_scene', 'render_ui', 'revise_ui', 'secretary_action'].includes(t.name) ? { pre_tool_speech: 'force' } : {}),
+      ...(['open_scene', 'render_ui', 'revise_ui', 'secretary_action', 'search_videos'].includes(t.name) ? { pre_tool_speech: 'force' } : {}),
       parameters: { type: 'object', properties, required },
     };
   });

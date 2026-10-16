@@ -11,6 +11,13 @@ test('pay opens the payment scene', () => {
   assert.equal(keywordRoute('pay for it').scene, 'payment');
 });
 
+test('video tutorial requests open YouTube search with the useful subject terms', () => {
+  const r = keywordRoute('ช่วยหาวิดีโอสอนเล่น rubric ให้หน่อย');
+  assert.equal(r.scene, 'video-search');
+  assert.equal(r.data.query, "เล่น Rubik's Cube");
+  assert.match(r.say, /YouTube/);
+});
+
 test('voice can never approve a payment', () => {
   for (const said of ['allow', 'yes', 'ok pay now', 'อนุมัติ', 'จ่ายเลย']) {
     const r = keywordRoute(said, 'payment');
