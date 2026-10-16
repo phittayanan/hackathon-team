@@ -12,6 +12,9 @@ for (const [width, height] of [[1440, 900], [1280, 800], [1920, 1080], [1280, 68
     await expect(page.locator('#fallbackInput')).toBeVisible();
     await expect(page.locator('[data-testid=composer] .send')).toBeVisible();
     await expect(page.locator('#mic')).toBeVisible();
+    // Q-Bot says what it can do, written into the page: no tap, no network needed.
+    await expect(page.getByTestId('self-intro')).toBeVisible();
+    await expect(page.getByTestId('self-intro')).toContainText('Q-Bot');
     await expect(page.getByTestId('shopify-catalog')).toHaveCount(0);
     await expect(page.getByText('เลือกสินค้า')).toHaveCount(0);
     const fit = async () => page.evaluate(() => {
@@ -31,6 +34,10 @@ for (const [width, height] of [[1440, 900], [1280, 800], [1920, 1080], [1280, 68
     await expect(page.locator('body')).toHaveClass(/started/);
     await page.waitForTimeout(300);
     expect(await fit()).toEqual({ composer: true, phone: true, noPageScroll: true, homeFits: true });
+    // The suggestions come below the introduction.
+    const intro = await page.getByTestId('self-intro').boundingBox();
+    const chip = await page.locator('#suggest button').first().boundingBox();
+    expect(chip.y).toBeGreaterThanOrEqual(intro.y + intro.height);
   });
 }
 

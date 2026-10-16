@@ -6,6 +6,8 @@ test('Q-Bot home: only the agent and the composer from the start, suggestions af
   await expect(page.locator('body')).toHaveAttribute('data-ready', '1');
   await expect(page).toHaveTitle('Q-Bot');
   await expect(page.locator('.intro')).toHaveText('Q-Bot');
+  await expect(page.getByTestId('self-intro')).toContainText('สวัสดี ฉันคือ Q-Bot ผู้ช่วยของคุณ');
+  await expect(page.getByTestId('self-intro')).toContainText('ช่วยซื้อของตามอีเมล วางแผนวิ่ง เช็คเที่ยวบิน');
   // No button cluster on the home screen: everything goes through the agent.
   await expect(page.locator('.secretary-shortcuts, #catalogBtn, #memoryEntry')).toHaveCount(0);
   await expect(page.locator('#fallbackInput')).toBeVisible();
@@ -48,6 +50,7 @@ test('language switches live, preserves user data and open task state, and survi
   await page.locator('.secretary-task input').first().check();
   await page.locator('[data-language=en]').click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.getByTestId('self-intro')).toContainText('Hi, I’m Q-Bot, your assistant');
   // Every suggestion shows in English (the tap still sends the Thai words).
   const ens = await page.evaluate(async () => (await import('/js/suggest.js')).SUGGESTION_POOL.map((s) => s.en).concat('Today'));
   for (const text of await page.locator('#suggest button').allTextContents()) expect(ens).toContain(text);

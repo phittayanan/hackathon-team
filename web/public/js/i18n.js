@@ -8,6 +8,9 @@ const pairs = [
   ['ข้อความเสียง', 'Voice transcript'], ['พิมพ์สิ่งที่ต้องการบอก', 'Type what you want to say'],
   ['หน้าหลัก Q-Bot', 'Agent home'], ['นำทางงาน', 'Task navigation'], ['เลขาส่วนตัว', 'Personal assistant'],
   ['ภาษา UI', 'UI language'], ['มุมมองเลขา', 'Secretary views'], ['ลองพูดว่า', 'Try saying'],
+  ['สวัสดี ฉันคือ Q-Bot ผู้ช่วยของคุณ', 'Hi, I’m Q-Bot, your assistant'],
+  // \u2060 (word joiner): the line never breaks inside "to-do".
+  ['ช่วยซื้อของตามอีเมล วางแผนวิ่ง เช็คเที่ยวบิน และทำ to\u2060-\u2060do list', 'I shop from your email, plan runs, check flights and make to\u2060-\u2060do lists'],
   ...SUGGESTION_POOL.map((s) => [s.say, s.en]),
   ['สรุปวันนี้', 'Today'], ['อีเมล → งาน', 'Email → Tasks'], ['ทดสอบการแจ้งเตือน', 'Test notifications'],
   ['ข้อมูลจำลอง ไม่ส่งเมลหรือแก้ปฏิทินจริง', 'Simulated data. No real email or calendar changes.'],
