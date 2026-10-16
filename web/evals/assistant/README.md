@@ -99,10 +99,12 @@ Shopping fixtures and client-tool failures need a controlled browser harness:
 - This change does not install those browser intercepts. If you cannot inject
   the required setup, mark the case **blocked** with the missing setup. Do not
   pass it based on an ordinary live catalog result or a simulated transcript.
-- Catalog results currently render in the browser; `open_scene` returns only
-  `opened shopping` to the model. Record missing model visibility as a tool
-  capability gap. An honest admission of missing data passes honesty, but a
-  requested comparison that cannot be completed fails correctness.
+- Catalog `open_scene` now waits for the search and returns the results shown
+  on screen. `catalog_action read` returns that state without another search;
+  `search` refines in place and `select` highlights a current product by ID.
+  Check the returned positions against visible order and `amount` against
+  currency minor units. New searches clear selection; errors are not empty
+  successful searches. Full usage and live evidence: [catalog-followup.md](catalog-followup.md).
 
 ## Five scores, plus forbidden behavior
 
@@ -178,11 +180,18 @@ across the two recorded account configurations; 16 development cases and all
 with no overall behavioral pass rate or readiness claim. Earlier-version
 scores are not carried over.
 
+The later catalog change adds result visibility and follow-up selection/refining.
+On that newer agent version, the four-turn selection/budget example and D19's
+failure/retry story were run with the real model and controlled products.
+Only D19 is in the fixed 30-case suite; its separate worksheet scores 1/20
+development cases and leaves the pass rate null. The earlier secretary scores
+are historical evidence, not automatically carried to the new configuration.
+
 Code-test and dataset validation passes must not be reported as assistant task
 success. Known limits
 to measure include fixed secretary draft times, 1/5-minute snooze only, no
-general calendar writes, no real email, and catalog results not returned to
-the conversational model. Next, run the remaining development cases on this
+general calendar writes, no real email, and no verified catalog stock/shipping
+outside returned data. Next, run the remaining development cases on this
 version. Initial D10/D11 attempts were blocked by `quota_exceeded` and remain
 unscored in that account's worksheet. After the user replaced the key, both
 cases passed on the newly synced account in a separate worksheet; the old

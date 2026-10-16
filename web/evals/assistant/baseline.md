@@ -52,9 +52,9 @@ lost/duplicate tasks, wrong final count) did not occur. The grounding error
 still fails two metrics, so the case fails. Development completion is 1/20;
 pass rate remains **null**, not an extrapolated score for the whole assistant.
 
-## Next change to evaluate
+## Initial grounding hypothesis
 
-The client tool currently returns secretary state without the email body.
+At that point the client tool returned secretary state without the email body.
 That is an observed visibility gap. Confusion with the hardcoded meeting-notice
 scenario is a plausible explanation for the invented request, not proof of the
 model's internal reasoning. Return structured email facts and keep notification
@@ -242,3 +242,12 @@ four unique development cases have been tried, leaving 16 other development
 cases and the held-out set untested. Critical D10/D11 repetitions and actual
 microphone-input testing remain outstanding. No source change or additional
 code-test rerun was needed for the key replacement and live-only checks.
+
+## Catalog result visibility and follow-ups
+
+The user then selected the product-follow-up capability. App change `dadf3f0`
+makes the catalog return displayed products, wait for initial results and
+support reading, refining and selecting by current product ID. Live evidence,
+controlled fixture details and the separate real-Shopify probe are recorded in
+[catalog-followup.md](catalog-followup.md). This changes the remote agent
+configuration, so previous secretary results remain historical runs.
