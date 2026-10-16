@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateSpec, cannedTodo, cannedFirstAid, reviseByKeywords, markDone, changeNote, pageSummary } from '../public/js/genui.js';
+import { validateSpec, BLOCK_TYPES, cannedTodo, cannedFirstAid, reviseByKeywords, markDone, changeNote, pageSummary } from '../public/js/genui.js';
 import { keywordRoute, route } from './router.js';
 
 test('validateSpec drops unknown components and keeps strings plain', () => {
@@ -95,4 +95,49 @@ test('markDone: a toggle on a model page ticks the checklist item it shows; the 
 test('changeNote: a [screen] line with the change and what the page shows now', () => {
   const spec = validateSpec(cannedTodo());
   assert.equal(changeNote('ticked "x"', spec), `[screen] The user changed the page: ticked "x". Page now shows: ${pageSummary(spec)}`);
+});
+
+// A real render_ui spec_json from the production run log: each block keyed by its type.
+const KEYED_LIVE_SPEC = {"kind":"checklist","name":"แผนฝึกรูบิก","match":["รูบิก","ฝึก"],"title":"แผนฝึกรูบิก","subtitle":"เริ่มใหม่แบบเบาๆ","accent":"blue","urgency":"none","blocks":[{"checklist":{"items":[{"text":"ฝึกพื้นฐาน","done":false,"due":"2026-10-17","tag":"เริ่มต้น"},{"text":"ฝึกสูตรง่าย","done":false,"due":"2026-10-18","tag":"ขั้นกลาง"},{"text":"ฝึกสูตรยาก","done":false,"due":"2026-10-19","tag":"ขั้นสูง"}]}}],"proposals":[{"id":"add_note","label":"เพิ่มบันทึก"},{"id":"change_color","label":"เปลี่ยนสี"}]};
+
+test('validateSpec accepts the live spec with blocks keyed by type', () => {
+  const s = validateSpec(KEYED_LIVE_SPEC);
+  assert.ok(s);
+  assert.equal(s.blocks.length, 1);
+  assert.equal(s.blocks[0].type, 'checklist');
+  assert.equal(s.blocks[0].items.length, 3);
+  assert.deepEqual(s.blocks[0].items[0], { text: 'ฝึกพื้นฐาน', done: false, due: '2026-10-17', tag: 'เริ่มต้น' });
+});
+
+test('every block type is accepted in the keyed shape', () => {
+  const bodies = {
+    text: { text: 'hi' },
+    stat: { label: 'Days', value: 3 },
+    progress: { label: 'Done', value: 40 },
+    checklist: { items: [{ text: 'a', done: false }] },
+    list: { items: ['a'] },
+    card: { title: 'T', text: 'x' },
+    chart: { bars: [{ label: 'a', value: 1 }] },
+    field: { label: 'Name', placeholder: 'x' },
+    button: { label: 'Go' },
+    divider: {},
+    steps: { items: ['one'] },
+    call: { number: '1669' },
+    image: { prompt: 'a cube' },
+    sources: { items: [{ title: 'S', url: 'https://example.com' }] },
+  };
+  assert.deepEqual(Object.keys(bodies).sort(), [...BLOCK_TYPES].sort());
+  for (const [type, body] of Object.entries(bodies)) {
+    const keyed = validateSpec({ blocks: [{ [type]: body }] });
+    assert.ok(keyed, type);
+    assert.deepEqual(keyed.blocks, validateSpec({ blocks: [{ type, ...body }] }).blocks, type);
+  }
+});
+
+test('a keyed block with an unknown key is still dropped', () => {
+  assert.equal(validateSpec({ blocks: [{ script: { src: 'evil.js' } }] }), null);
+  const s = validateSpec({ blocks: [{ iframe: { src: 'x' } }, { text: { text: 'ok' } }] });
+  assert.deepEqual(s.blocks, [{ type: 'text', text: 'ok' }]);
+  // Two keys, or a non-object value, is not the keyed shape.
+  assert.equal(validateSpec({ blocks: [{ text: { text: 'a' }, card: { title: 'b' } }, { text: 'plain' }] }), null);
 });

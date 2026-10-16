@@ -131,14 +131,16 @@ const PAGES = {
     <div class="tile">เป้าหมาย 8 แก้ว</div><div class="tile">เหลืออีก 5 แก้ว</div></main></body></html>`,
   savings: `<!doctype html><html><head><style>
     body{margin:0;background:#f6efe4;color:#2b2420}.split{display:flex;flex-direction:column;gap:16px;padding:24px 18px 90px}
-    .num{font-size:88px;font-weight:900;line-height:1;color:#7a2f9a}.num small{font-size:20px;color:#6f645b;display:block}
+    .num{font-size:88px;font-weight:900;line-height:1;color:#7a2f9a;margin:0}.num small{font-size:20px;font-weight:400;color:#6f645b;display:block}
     .ring{width:180px;margin:0 auto}.rows{background:#fffdf9;border-radius:22px;padding:6px 16px}.rows p{display:flex;justify-content:space-between;margin:12px 0}
-    </style></head><body><div class="split"><div class="num">62%<small>ของเป้าเที่ยวญี่ปุ่น ฿40,000</small></div>
+    </style></head><body><div class="split"><h1 class="num">62%<small>ของเป้าเที่ยวญี่ปุ่น ฿40,000</small></h1>
     <svg class="ring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#efe3d0" stroke-width="4"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="#7a2f9a" stroke-width="4" stroke-dasharray="62 38"/></svg>
     <div class="rows"><p><span>เก็บแล้ว</span><b>฿24,800</b></p><p><span>ต่อเดือน</span><b>฿3,800</b></p><p><span>ถึงเป้า</span><b>ก.พ. 2027</b></p></div></div></body></html>`,
 };
 
-const SPEC = { kind: 'trip', name: 'Trip', title: 'ทริปหัวหิน', accent: 'blue', blocks: [{ type: 'text', text: 'ทะเลสวย' }, { type: 'button', label: 'จองที่พักเลย' }], proposals: [{ id: 'a', label: 'Add weather' }] };
+// The spec each sample page was written for: the layout check wants the page to show its title.
+const TITLES = { beach: 'หัวหินริมทะเล', water: 'ดื่มน้ำวันนี้', savings: 'เป้าเที่ยวญี่ปุ่น' };
+const SPEC = { kind: 'trip', name: 'Trip', title: TITLES.beach, accent: 'blue', blocks: [{ type: 'text', text: 'ทะเลสวย' }, { type: 'button', label: 'จองที่พักเลย' }], proposals: [{ id: 'a', label: 'Add weather' }] };
 const openWithBrief = (page, spec = SPEC, design = 'Sunny beach-postcard hero, big date, timeline, big Book button.') =>
   page.evaluate(([s, d]) => window.agentOS.openScene('generated', { spec: s, design: d }), [spec, design]);
 // Stub the page model: answer with this HTML after `delay` ms. Returns the list of request bodies.
@@ -158,14 +160,14 @@ test('design brief: the block page shows at once, then the model page swaps in (
     await page.unrouteAll();
     const calls = await stubPage(page, html, { delay: 250 });
     await home(page);
-    await openWithBrief(page);
+    await openWithBrief(page, { ...SPEC, title: TITLES[name] });
     await expect(scene(page)).toHaveAttribute('data-view', 'blocks');
-    await expect(page.locator('[data-testid=g-title]')).toHaveText('ทริปหัวหิน');
+    await expect(page.locator('[data-testid=g-title]')).toHaveText(TITLES[name]);
     await expect(scene(page)).toHaveAttribute('data-view', 'html');
     await expect(page.locator('[data-testid=g-title]')).toHaveCount(0);
     await expect(page.locator('[data-testid=g-chips] .g-chip')).toHaveCount(2); // the app's own like question stays
     expect(calls[0].design).toMatch(/beach-postcard/);
-    expect(calls[0].spec.title).toBe('ทริปหัวหิน');
+    expect(calls[0].spec.title).toBe(TITLES[name]);
     if (SHOTS) {
       await page.waitForTimeout(100);
       await page.screenshot({ path: `${SHOTS}/page-${name}.png` });
@@ -178,7 +180,7 @@ test('model page: a <script> and an onclick are removed; the page still shows an
   const evil = PAGES.beach
     .replace('</head>', '<script>window.__pwned = 1</script></head>')
     .replace('data-action="book"', 'data-action="book" onclick="window.__pwned = 2"')
-    .replace('<ol', '<img src="x" onerror="window.__pwned = 3"><a href="javascript:window.__pwned=4">x</a><ol');
+    .replace('<ol', '<img src="x" onerror="window.__pwned = 3"><a href="javascript:window.__pwned=4" style="display:block;padding:12px">อ่านต่อ</a><ol');
   await stubPage(page, evil);
   await home(page);
   await openWithBrief(page);
@@ -198,7 +200,7 @@ test('model page: a timeout, an error, an unfinished page or an urgent spec keep
   await openWithBrief(page);
   await page.waitForTimeout(1500);
   await expect(scene(page)).toHaveAttribute('data-view', 'blocks');
-  await expect(page.locator('[data-testid=g-title]')).toHaveText('ทริปหัวหิน');
+  await expect(page.locator('[data-testid=g-title]')).toHaveText(TITLES.beach);
 
   for (const [html, status] of [['{"error":"no ElevenLabs key"}', 503], [PAGES.beach.slice(0, 600), 200]]) {
     await page.unrouteAll();
@@ -221,7 +223,7 @@ test('model page: a timeout, an error, an unfinished page or an urgent spec keep
 test('model page offline (no live agent): data-action works like saying its label; toggles and counters work', async ({ page }) => {
   await stubPage(page, PAGES.water);
   await home(page);
-  await openWithBrief(page);
+  await openWithBrief(page, { ...SPEC, title: TITLES.water });
   const host = page.locator('[data-testid=g-html]');
   await host.locator('[aria-label=เพิ่ม]').click();
   await host.locator('[aria-label=เพิ่ม]').click();
@@ -270,7 +272,7 @@ test('live: render_ui with a design brief; a data-action tap reaches the agent a
   );
 
   // A revise draws the block page at once and asks for a new model page with the same brief.
-  await tool(page, 'revise_ui', { spec_json: JSON.stringify({ ...SPEC, title: 'ทริปหัวหิน 2 วัน' }) });
+  await tool(page, 'revise_ui', { spec_json: JSON.stringify({ ...SPEC, subtitle: '2 วัน' }) });
   await expect(scene(page)).toHaveAttribute('data-version', '1');
   await expect(scene(page)).toHaveAttribute('data-view', 'html');
   expect(calls).toHaveLength(2);
@@ -305,4 +307,51 @@ test('live: ticking an item or a toggle sends a silent [screen] update with the 
   await host.locator('[aria-label=เพิ่ม]').click();
   await expect.poll(context).toContain('[screen] The user changed the page: set "cups" to 4.');
   expect(await page.evaluate(() => window.__conv.context.filter((t) => t.startsWith('[screen] The user changed')).length)).toBe(3);
+});
+
+// ---------- Layout check on the painted model page (page-check.js) ----------
+
+const PACK = { kind: 'pack', name: 'Pack', title: 'จัดกระเป๋าไปทะเล', accent: 'blue', proposals: [], blocks: [{ type: 'checklist', items: [{ text: 'ครีมกันแดด' }, { text: 'ชุดว่ายน้ำ' }, { text: 'แว่นกันแดด' }] }] };
+const packPage = (items, extraCss = '') => `<!doctype html><html><head><style>
+  body{margin:0;padding:20px 16px 90px;background:#e8f4ff;color:#14273a}h1{font-size:32px;margin:0 0 16px}
+  ul{list-style:none;padding:0;margin:0}li{min-height:48px;padding:12px;margin:0 0 8px;background:#fff;border-radius:14px}
+  ${extraCss}</style></head><body><h1>จัดกระเป๋าไปทะเล</h1><p>ของที่ต้องเอาไปเที่ยวทะเลวันเสาร์นี้</p>
+  <ul>${items.map((t) => `<li data-toggle="${t}">${t}</li>`).join('')}</ul></body></html>`;
+const pageChecks = (page) => page.evaluate(() => window.__runlog.filter((e) => e.type === 'page_check'));
+
+test('layout check: a model page that overlaps and drops an item goes back to the block page; log line and a silent note', async ({ page }) => {
+  // The title sits on top of the first item, and "แว่นกันแดด" is missing.
+  const calls = await stubPage(page, packPage(['ครีมกันแดด', 'ชุดว่ายน้ำ'], 'h1{position:absolute;top:96px;left:16px}'));
+  await liveHome(page);
+  await tool(page, 'render_ui', { spec_json: JSON.stringify(PACK), design: 'Beach packing list' });
+  await expect.poll(() => pageChecks(page).then((x) => x.length)).toBe(1);
+  await expect(scene(page)).toHaveAttribute('data-view', 'blocks');
+  await expect(page.locator('[data-testid=g-title]')).toHaveText('จัดกระเป๋าไปทะเล');
+  await expect(page.locator('.g-checklist li')).toHaveCount(3);
+  const [line] = await pageChecks(page);
+  expect(line.text).toMatch(/^\[page check\] block page kept: .*overlap: "จัดกระเป๋าไปทะเล" and "ครีมกันแดด".*missing: item "แว่นกันแดด"/);
+  const context = await page.evaluate(() => window.__conv.context.join('\n'));
+  expect(context).toContain('[screen] The designed page was replaced by the simple page because: overlap: ');
+  expect(context).toContain('missing: item "แว่นกันแดด"');
+  expect(await page.evaluate(() => window.__conv.sent.join('\n'))).not.toContain('replaced');
+  await page.waitForTimeout(300);
+  expect(calls).toHaveLength(1); // no retry
+});
+
+test('layout check: a clean model page stays, and a kept page reopens as the model page', async ({ page }) => {
+  const calls = await stubPage(page, packPage(PACK.blocks[0].items.map((i) => i.text)));
+  await home(page);
+  await openWithBrief(page, PACK, 'Beach packing list');
+  await expect(scene(page)).toHaveAttribute('data-view', 'html');
+  await page.waitForTimeout(300);
+  await expect(scene(page)).toHaveAttribute('data-view', 'html');
+  await say(page, 'I like it');
+  await say(page, 'yes keep it');
+  await expectHome(page);
+  await page.evaluate(() => window.agentOS.openScene('generated', { savedKind: 'pack' }));
+  await expect(scene(page)).toHaveAttribute('data-view', 'html');
+  await page.waitForTimeout(300);
+  await expect(scene(page)).toHaveAttribute('data-view', 'html');
+  expect(await pageChecks(page)).toEqual([]);
+  expect(calls).toHaveLength(1);
 });

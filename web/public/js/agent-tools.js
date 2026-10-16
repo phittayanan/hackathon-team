@@ -79,13 +79,15 @@ export const TOOL_DEFS = [
       '{kind, name, match:[words], title, subtitle, accent: orange|green|blue|purple|pink|dark, urgency: none|urgent|serious, ' +
       'blocks:[...], proposals:[{id,label}]}. Block types: text{text} stat{label,value} progress{label,value 0-100 or "auto"} ' +
       'checklist{items:[{text,done,due,tag}]} list{items} card{title,text} chart{bars:[{label,value}]} field{label,placeholder} ' +
-      'button{label} divider{} steps{items} call{label,number 1669|191|199} image{prompt,caption} (a short picture prompt; at most 2).  After it opens, ask if the user likes it and propose one or two changes ' +
+      'button{label} divider{} steps{items} call{label,number 1669|191|199} image{prompt,caption} (a short picture prompt; at most 2). Each block is an object with a type field, for example ' +
+      '{"type":"checklist","items":[{"text":"...","done":false}]}.  After it opens, ask if the user likes it and propose one or two changes ' +
       '(unless urgent). With design, a design model then redraws the page as a free-form page in a few seconds.',
     params: { spec_json: { type: 'string', description: 'The UI spec as a JSON string', required: true }, design: DESIGN_PARAM, plan: PLAN_PARAM },
   },
   {
     name: 'revise_ui',
-    description: 'Redraw the open generated page with a changed spec (same format as render_ui), after the user asked for a change.',
+    description: 'Redraw the open generated page with a changed spec (same format as render_ui, each block like ' +
+      '{"type":"checklist","items":[{"text":"...","done":false}]}), after the user asked for a change.',
     params: { spec_json: { type: 'string', description: 'The full changed UI spec as a JSON string', required: true }, design: DESIGN_PARAM },
   },
   {
@@ -137,6 +139,10 @@ const parseJson = (text) => {
 };
 
 // Tools that finish a step of the plan line, and what each saves as the user's last task.
+// render_ui and revise_ui: names the block shape so the agent can fix its next call.
+const NO_BLOCKS = 'error: spec has no usable blocks; write each block as {"type":"<block type>", ...fields}, ' +
+  'for example {"type":"checklist","items":[{"text":"...","done":false}]}, using only the fixed block types';
+
 const STEP_TOOLS = ['open_scene', 'scene_action', 'render_ui', 'revise_ui', 'keep_scene', 'search_videos'];
 const FAILED = /^(error|refused|no results|no page)/;
 const SCENE_TASKS = {
@@ -277,7 +283,7 @@ function createScreenHandlers(ui, learn) {
         return withSummary(`reopened the kept page "${kept.name || kept.kind}"; say it is ready, do not ask if they like it`, shown);
       }
       let spec = validateSpec(parsed);
-      if (!spec) return 'error: spec has no usable blocks; use only the fixed components';
+      if (!spec) return NO_BLOCKS;
       passedOver();
       await ui.openScene('generated', { spec, ...(spec.urgency === 'none' ? designOf(design) : {}) });
       if (spec.urgency === 'none') offered = { spec };
@@ -288,7 +294,7 @@ function createScreenHandlers(ui, learn) {
       const open = generated();
       if (!open) return 'error: no generated page is open';
       let spec = validateSpec(parseJson(spec_json));
-      if (!spec) return 'error: spec has no usable blocks';
+      if (!spec) return NO_BLOCKS;
       // A revise keeps the sources of the page it changes.
       const before = open.ctl.state?.().spec;
       spec = withSources(spec, before?.blocks.find((b) => b.type === 'sources')?.items);
