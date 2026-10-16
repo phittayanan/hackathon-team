@@ -5,14 +5,18 @@ import { createHandlers } from './handlers.js';
 import { createUsage, memoryStore } from './usage.js';
 import { syncAll } from '../scripts/agent-sync.js';
 import { AGENT_NAME, KNOWLEDGE_NAME, PAGE_AGENT_NAME } from '../agent/config.js';
+import { isOutOfCredit } from './tts.js';
+import { ACCOUNT_BLOCKED } from '../public/js/account-blocked.js';
 
 const ANNA = 'key-anna-1234567';
 const BEN = 'key-ben-7654321';
 const QUOTA = '{"detail":{"status":"quota_exceeded","message":"This request exceeds your quota"}}';
+// The exact message of a workspace blocked mid-day (2026-10-16).
+const RESTRICTED = '[account_restricted] This workspace is restricted from the free tier. Upgrade your plan to start a new conversation.';
 const res = (status, body) => ({ ok: status < 300, status, json: async () => body, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)), arrayBuffer: async () => new Uint8Array([1]).buffer });
 
 // A stubbed ElevenLabs, one agent per key (by name); keys in `empty` are out of credit. No network.
-function fakeEleven({ empty = [], agents = { [ANNA]: 'agent_a', [BEN]: 'agent_b' } } = {}) {
+function fakeEleven({ empty = [], agents = { [ANNA]: 'agent_a', [BEN]: 'agent_b' }, emptyStatus = 401, emptyBody = QUOTA } = {}) {
   const calls = [];
   const fetchImpl = async (url, opts = {}) => {
     const key = opts.headers?.['xi-api-key'];
@@ -22,7 +26,7 @@ function fakeEleven({ empty = [], agents = { [ANNA]: 'agent_a', [BEN]: 'agent_b'
       const id = agents[key];
       return res(200, { agents: [{ agent_id: 'other', name: `${AGENT_NAME} [test: x]` }, ...(id ? [{ agent_id: id, name: AGENT_NAME }] : [])], has_more: false });
     }
-    if (empty.includes(key)) return res(401, QUOTA);
+    if (empty.includes(key)) return res(emptyStatus, emptyBody);
     if (u.pathname.endsWith('get-signed-url')) return res(200, { signed_url: `wss://x/${u.searchParams.get('agent_id')}` });
     return res(200, {});
   };
@@ -69,6 +73,43 @@ test('rotation: each key finds its agent by name; the first runs out, this call 
     assert.equal(fake.calls.some((c) => c.path === '/v1/convai/agents'), false); // agent id cached
   });
   assert.equal((await a.health()).offline, null);
+});
+
+test('a blocked workspace (account_restricted) counts as out of credit, whatever the status', () => {
+  for (const status of [400, 401, 403, 500]) assert.equal(isOutOfCredit(status, RESTRICTED), true);
+  assert.equal(isOutOfCredit(403, 'restricted from the free tier'), true);
+  assert.equal(isOutOfCredit(401, 'UPGRADE YOUR PLAN'), true);
+  assert.equal(isOutOfCredit(403, 'forbidden'), false);
+  // The page's live agent (live-agent.js) uses the same pattern on the close reason and on errors.
+  assert.equal(ACCOUNT_BLOCKED.test(RESTRICTED), true);
+  assert.equal(ACCOUNT_BLOCKED.test('the line dropped'), false);
+});
+
+for (const status of [401, 403]) {
+  test(`rotation: a blocked workspace (${status} account_restricted) is marked and the next key is used, for the session and TTS`, async () => {
+    const env = { ELEVENLABS_API_KEYS: `${ANNA},${BEN}` };
+    const fake = fakeEleven({ empty: [ANNA], emptyStatus: status, emptyBody: RESTRICTED });
+    const a = app(env, fake);
+    await withFetch(fake, async () => {
+      const s = await a.session({});
+      assert.equal(s.live, true);
+      assert.equal(s.account, accountId(BEN));
+      fake.calls.length = 0;
+      await a.tts({}, { text: 'สวัสดี' });
+      assert.deepEqual(fake.calls.map((c) => c.key), [BEN]); // the blocked account is skipped at once
+    });
+    assert.equal((await a.health()).offline, null);
+  });
+}
+
+test('rotation: a blocked workspace on TTS first (the 401 seen today) moves TTS to the next key', async () => {
+  const env = { ELEVENLABS_API_KEYS: `${ANNA},${BEN}` };
+  const fake = fakeEleven({ empty: [ANNA], emptyBody: RESTRICTED });
+  const a = app(env, fake);
+  await withFetch(fake, async () => {
+    await a.tts({}, { text: 'สวัสดี' });
+    assert.deepEqual(fake.calls.map((c) => c.key), [ANNA, BEN]);
+  });
 });
 
 test('rotation: every account empty -> offline credit, in the call and in health', async () => {

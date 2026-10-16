@@ -1,4 +1,5 @@
 // ElevenLabs text to speech. The key stays on the server.
+import { ACCOUNT_BLOCKED } from '../public/js/account-blocked.js';
 // Default voice: "Jessica" (premade, multilingual; speaks Thai with eleven_v4).
 export const DEFAULT_VOICE = 'cgSgspJ2msm6clMCkdW9';
 export const DEFAULT_MODEL = 'eleven_v4';
@@ -21,8 +22,9 @@ export async function elevenTts(text, env = process.env, fetchImpl = fetch) {
 }
 
 // ElevenLabs answers 401 quota_exceeded (or 402/429 with a credit message) when the credit runs out.
+// A blocked workspace (account_restricted) counts too, whatever the status.
 export const isOutOfCredit = (status, text = '') =>
-  [401, 402, 429].includes(status) && /quota|credit|insufficient|exceeded/i.test(text);
+  ([401, 402, 429].includes(status) && /quota|credit|insufficient|exceeded/i.test(text)) || ACCOUNT_BLOCKED.test(text);
 
 export function creditError(status, text, what) {
   const err = new Error(`${what} ${status}`);
