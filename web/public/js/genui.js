@@ -41,8 +41,17 @@ const webUrl = (v) => {
   }
 };
 const arr = (v, max) => (Array.isArray(v) ? v.slice(0, max) : []);
+const isObj = (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+
+// The model sometimes writes a block keyed by its type, {"checklist": {...}}; turn it into {type: 'checklist', ...}.
+function unkey(b) {
+  if (!isObj(b) || 'type' in b) return b;
+  const keys = Object.keys(b);
+  return keys.length === 1 && BLOCK_TYPES.includes(keys[0]) && isObj(b[keys[0]]) ? { ...b[keys[0]], type: keys[0] } : b;
+}
 
 function cleanBlock(b) {
+  b = unkey(b);
   if (!b || !BLOCK_TYPES.includes(b.type)) return null;
   switch (b.type) {
     case 'text': return { type: 'text', text: str(b.text, 300) };

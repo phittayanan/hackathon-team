@@ -57,6 +57,19 @@ test('render_ui validates the spec; unknown components are dropped', async () =>
   assert.equal(log[0][2].spec.blocks.length, 2);
 });
 
+test('render_ui and revise_ui: the no-usable-blocks error names the block shape on one line', async () => {
+  const h = createToolHandlers(fakeUi().ui);
+  const bad = await h.render_ui({ spec_json: '{"blocks":[{"type":"script"}]}' });
+  await h.render_ui({ spec_json: JSON.stringify(cannedTodo()) });
+  for (const err of [bad, h.revise_ui({ spec_json: '{"blocks":[]}' })]) {
+    assert.match(err, /^error: spec has no usable blocks/);
+    assert.match(err, /\{"type":"checklist","items":\[\{"text":"\.\.\.","done":false\}\]\}/);
+    assert.ok(!err.includes('\n'));
+  }
+  const defs = Object.fromEntries(TOOL_DEFS.map((t) => [t.name, t.description]));
+  for (const name of ['render_ui', 'revise_ui']) assert.match(defs[name], /\{"type":"checklist","items":\[\{"text":"\.\.\.","done":false\}\]\}/, name);
+});
+
 test('mark_urgent and keep_scene: first-aid pages are never kept', async () => {
   const { ui, log } = fakeUi();
   const h = createToolHandlers(ui);
