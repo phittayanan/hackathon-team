@@ -3,6 +3,8 @@
 // block page shows at once and a page model (POST /api/page) writes a free HTML page that is swapped in
 // as it streams. That HTML is sanitized (page-sanitize.js) and shown in a shadow root: scripts written
 // by the model never run; taps on data-action reach the agent as [scene event] lines through this code.
+// Other changes the user makes by hand (a ticked item, a counter, a toggle) reach the live agent as a
+// silent [screen] update with what the page shows now; the spec in memory follows them.
 // No answer, an error, a timeout or a page that fails the checks: the block page stays.
 // The agent asks if the user likes it; spoken answers revise the spec and it redraws in place.
 // A page the user likes can be kept as a saved scene in localStorage (with its HTML, if it had one).
@@ -10,6 +12,7 @@ import { T } from '../timing.js';
 import { apiFetch } from '../api.js';
 import { sanitizePage, sanitizePartial, pageOk } from '../page-sanitize.js';
 import { applyStyle, styleText } from '../style.js';
+import { changeNote, markDone } from '../genui.js';
 
 // The browser waits a little longer than the server's own 12 s limit (lib/page-model.js).
 const PAGE_WAIT_MS = 14_000;
@@ -110,7 +113,7 @@ function drawBlock(b, spec, onChange, onButton) {
         li.append(box, h('span', 'g-item', item.text));
         if (item.tag) li.append(h('em', `g-tag g-tag-${item.tag.toLowerCase()}`, item.tag));
         if (item.due) li.append(h('small', 'g-due', item.due));
-        li.addEventListener('click', () => { item.done = !item.done; onChange(); });
+        li.addEventListener('click', () => { item.done = !item.done; onChange(`${item.done ? 'ticked' : 'unticked'} "${item.text}"`); });
         ul.append(li);
       });
       return ul;
@@ -205,21 +208,30 @@ function drawBlock(b, spec, onChange, onButton) {
   return h('div');
 }
 
+const shortText = (el) => (el.getAttribute('aria-label') || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+
 // Taps inside a model-written page. Only this code reacts; the page itself has no scripts.
-function wirePage(root, agent) {
+// changed({ toggle | count }, tapped): tapped = the same tap also went to the agent as a scene event.
+function wirePage(root, agent, changed) {
   root.addEventListener('click', (e) => {
     const t = e.target instanceof Element ? e.target : null;
     if (!t) return;
+    const act = t.closest('[data-action]');
     const toggle = t.closest('[data-toggle]');
-    if (toggle) toggle.dataset.on = toggle.dataset.on === 'true' ? 'false' : 'true';
+    if (toggle) {
+      toggle.dataset.on = toggle.dataset.on === 'true' ? 'false' : 'true';
+      changed({ toggle: { text: shortText(toggle) || toggle.dataset.toggle, on: toggle.dataset.on === 'true' } }, Boolean(act));
+    }
     const step = t.closest('[data-count-step]');
     if (step) {
       const out = [...root.querySelectorAll('[data-count]')].find((x) => x.dataset.count === step.dataset.countStep);
-      if (out) out.textContent = String(Math.max(0, (parseInt(out.textContent, 10) || 0) + (Number(step.dataset.step) || 1)));
+      if (out) {
+        out.textContent = String(Math.max(0, (parseInt(out.textContent, 10) || 0) + (Number(step.dataset.step) || 1)));
+        changed({ count: { name: out.dataset.count.slice(0, 40), value: out.textContent } }, Boolean(act));
+      }
     }
-    const act = t.closest('[data-action]');
     if (act) {
-      const label = (act.getAttribute('aria-label') || act.textContent || act.dataset.action).replace(/\s+/g, ' ').trim().slice(0, 60);
+      const label = shortText(act) || act.dataset.action.slice(0, 60);
       const value = act.dataset.value ? `, value: ${act.dataset.value.slice(0, 60)}` : '';
       agent.event?.(`The user tapped "${label}" on the page (action: ${act.dataset.action.slice(0, 40)}${value}). Act on it like a spoken request.`, label);
     }
@@ -255,6 +267,20 @@ export default function mountGenerated(el, data, agent) {
   let host = null;
   let pending = null;
 
+  // The user changed the page by hand: tell the live agent (app.js sends nothing offline).
+  const tell = (change) => agent.tell?.(changeNote(change, spec));
+  const pageChanged = ({ toggle, count }, tapped) => {
+    let change;
+    if (toggle) {
+      const out = markDone(spec, toggle.text, toggle.on);
+      spec = out.spec;
+      change = out.item ? `${toggle.on ? 'ticked' : 'unticked'} "${out.item.text}"` : `turned "${toggle.text}" ${toggle.on ? 'on' : 'off'}`;
+    } else {
+      change = `set "${count.name}" to ${count.value}`;
+    }
+    if (!tapped) tell(change);
+  };
+
   const paint = () => {
     host.shadowRoot.innerHTML = `<style>${PAGE_CSS}</style>${shown}`;
   };
@@ -274,7 +300,7 @@ export default function mountGenerated(el, data, agent) {
     if (view !== 'blocks' && shown) {
       host = h('div', 'g-html');
       host.dataset.testid = 'g-html';
-      wirePage(host.attachShadow({ mode: 'open' }), agent);
+      wirePage(host.attachShadow({ mode: 'open' }), agent, pageChanged);
       paint();
       el.append(host);
     } else {
@@ -283,7 +309,8 @@ export default function mountGenerated(el, data, agent) {
       title.dataset.testid = 'g-title';
       el.append(title);
       if (spec.subtitle) el.append(h('p', 'g-subtitle', spec.subtitle));
-      spec.blocks.forEach((b) => el.append(drawBlock(b, spec, () => draw(), (label) => agent.request(label))));
+      const ticked = (change) => { draw(); tell(change); };
+      spec.blocks.forEach((b) => el.append(drawBlock(b, spec, ticked, (label) => agent.request(label))));
     }
 
     const chips = h('div', 'g-chips');

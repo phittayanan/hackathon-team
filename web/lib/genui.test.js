@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateSpec, cannedTodo, cannedFirstAid, reviseByKeywords } from '../public/js/genui.js';
+import { validateSpec, cannedTodo, cannedFirstAid, reviseByKeywords, markDone, changeNote, pageSummary } from '../public/js/genui.js';
 import { keywordRoute, route } from './router.js';
 
 test('validateSpec drops unknown components and keeps strings plain', () => {
@@ -79,4 +79,20 @@ test('serious spec always gets 1669; call only to emergency numbers; urgent drop
 test('image block: prompt required, at most 2 per page', () => {
   const s = validateSpec({ blocks: [1, 2, 3].map((i) => ({ type: 'image', prompt: `pic ${i}` })).concat([{ type: 'image' }]) });
   assert.equal(s.blocks.length, 2);
+});
+
+test('markDone: a toggle on a model page ticks the checklist item it shows; the spec is not mutated', () => {
+  const spec = validateSpec({ title: 'Water', blocks: [{ type: 'checklist', items: ['Water', 'Water plants'] }] });
+  const out = markDone(spec, '  Water   plants (morning) ', true);
+  assert.equal(out.item.text, 'Water plants');
+  assert.deepEqual(out.spec.blocks[0].items.map((i) => i.done), [false, true]);
+  assert.deepEqual(spec.blocks[0].items.map((i) => i.done), [false, false]);
+  const none = markDone(spec, 'Something else', true);
+  assert.equal(none.item, null);
+  assert.equal(none.spec, spec);
+});
+
+test('changeNote: a [screen] line with the change and what the page shows now', () => {
+  const spec = validateSpec(cannedTodo());
+  assert.equal(changeNote('ticked "x"', spec), `[screen] The user changed the page: ticked "x". Page now shows: ${pageSummary(spec)}`);
 });

@@ -284,3 +284,25 @@ test('live: render_ui with a design brief; a data-action tap reaches the agent a
   await expect(page.locator('[data-testid=g-html] h1')).toContainText('หัวหิน');
   expect(calls).toHaveLength(2);
 });
+
+test('live: ticking an item or a toggle sends a silent [screen] update with the page now, never a user message', async ({ page }) => {
+  const calls = await stubPage(page, PAGES.water);
+  await liveHome(page);
+  const list = { kind: 'water', title: 'ดื่มน้ำ', blocks: [{ type: 'checklist', items: ['ตื่นนอน 1 แก้ว', 'หลังมื้อเที่ยง'] }] };
+  expect(await tool(page, 'render_ui', { spec_json: JSON.stringify(list) })).toContain('Page now shows: "ดื่มน้ำ". Checklist: 1. ตื่นนอน 1 แก้ว (not done)');
+  await page.locator('.g-checklist li').nth(1).click();
+  const context = () => page.evaluate(() => window.__conv.context.join('\n'));
+  await expect.poll(context).toContain('[screen] The user changed the page: ticked "หลังมื้อเที่ยง". Page now shows: "ดื่มน้ำ". Checklist: 1. ตื่นนอน 1 แก้ว (not done); 2. หลังมื้อเที่ยง (done)');
+  expect(await page.evaluate(() => window.__conv.sent.join('\n'))).not.toContain('หลังมื้อเที่ยง');
+
+  // A model page: the toggle ticks the matching item in the spec; the counter is reported as is.
+  await tool(page, 'revise_ui', { spec_json: JSON.stringify(list), design: 'Water tiles' });
+  await expect(scene(page)).toHaveAttribute('data-view', 'html');
+  expect(calls).toHaveLength(1);
+  const host = page.locator('[data-testid=g-html]');
+  await host.locator('[data-toggle=morning]').click();
+  await expect.poll(context).toContain('ticked "ตื่นนอน 1 แก้ว". Page now shows: "ดื่มน้ำ". Checklist: 1. ตื่นนอน 1 แก้ว (done); 2. หลังมื้อเที่ยง (not done)');
+  await host.locator('[aria-label=เพิ่ม]').click();
+  await expect.poll(context).toContain('[screen] The user changed the page: set "cups" to 4.');
+  expect(await page.evaluate(() => window.__conv.context.filter((t) => t.startsWith('[screen] The user changed')).length)).toBe(3);
+});

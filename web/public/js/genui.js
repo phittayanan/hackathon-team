@@ -147,6 +147,27 @@ export function pageSummary(spec) {
   return text.length > SUMMARY_MAX ? `${text.slice(0, SUMMARY_MAX - 1)}…` : text;
 }
 
+// The silent update the live agent gets when the user changes the open page by hand.
+export const changeNote = (change, spec) => `[screen] The user changed the page: ${change}. Page now shows: ${pageSummary(spec)}`;
+
+// A toggle on a model-written page: set done on the checklist item whose text the toggle shows
+// (the longest match wins). Returns the new spec and that item, or the same spec and null.
+export function markDone(spec, shownText, done) {
+  const norm = (t) => String(t || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const shown = norm(shownText);
+  let best = null;
+  spec.blocks.forEach((b, bi) => {
+    if (b.type !== 'checklist') return;
+    b.items.forEach((i, ii) => {
+      const t = norm(i.text);
+      if (t && shown.includes(t) && (!best || t.length > best.len)) best = { bi, ii, len: t.length };
+    });
+  });
+  if (!best) return { spec, item: null };
+  const blocks = spec.blocks.map((b, bi) => (bi !== best.bi ? b : { ...b, items: b.items.map((i, ii) => (ii === best.ii ? { ...i, done } : i)) }));
+  return { spec: { ...spec, blocks }, item: blocks[best.bi].items[best.ii] };
+}
+
 // ---------- No-key fallback: one canned todo spec and keyword revisions ----------
 
 const DUE = ['Today', 'Today', 'Tomorrow', 'Fri', 'Fri'];
