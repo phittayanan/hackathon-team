@@ -11,6 +11,7 @@ import { createRunLog, createConsoleLog } from './runlog.js';
 import { createUsage, LimitError } from './usage.js';
 import { searchShopifyCatalog } from './shopify-catalog.js';
 import { searchPlaces } from './places.js';
+import { searchReady, tavilySearch } from './search.js';
 import { pageReady, streamPage, PAGE_TIMEOUT_MS } from './page-model.js';
 import { validateSpec } from '../public/js/genui.js';
 
@@ -65,11 +66,24 @@ export function createHandlers({
       try { return await searchPlaces(body, env, fetchImpl); }
       catch (err) { return { error: err.name === 'TimeoutError' ? 'Google Maps ค้นหานานเกินไป กรุณาลองใหม่' : err.message }; }
     },
+    // Web search for the live agent's web_search tool. Errors come back as { error } (the agent
+    // then answers without it); only the daily limit is a 429 that switches the page offline.
+    async search(headers = {}, { query } = {}) {
+      if (!searchReady(env)) throw new HttpError(503, 'search is not configured');
+      await take('calls', headers);
+      try {
+        return await tavilySearch(query, env, fetchImpl);
+      } catch (err) {
+        const message = err.name === 'TimeoutError' ? 'search timeout' : err.message;
+        runLog.server('error', { where: 'search', message });
+        return { error: message };
+      }
+    },
     async health() {
       return {
         brain: liveReady() ? 'elevenlabs-agent' : 'keywords',
         tts: ttsReady(),
-        search: false,
+        search: searchReady(env),
         page: pageReady(accounts),
         offline: !liveReady() ? null : (await usage.siteFull()) ? 'limit' : (await accounts.allEmpty()) ? 'credit' : null,
       };

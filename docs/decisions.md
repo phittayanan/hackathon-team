@@ -39,6 +39,9 @@ Copy this block for a new decision:
   it went out with it, not by a decision of its own. The change is commit
   `794e172`, merged in pull request #38.
 - **Who decided:** osizk
+- **Update (pull request #60):** a general `web_search` tool is back for
+  current facts (events, prices, news). It is optional (`TAVILY_API_KEY`).
+  Products still come from Shopify.
 
 ## 2026-10-16: Pictures made ahead of time
 

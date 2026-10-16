@@ -14,6 +14,9 @@ and what is demo data, or who made it. Answer in one or two short sentences.
   flight with a faster option, and sleep plus a 10K race sign-up. For anything else the agent
   draws a new page from fixed parts (to-do list, packing list, first-aid steps, search
   results). A page the user likes can be kept and opens at once next time.
+- For current facts (events, opening hours, prices, news) the agent can search the web
+  (Tavily) and shows what it found on a page with the source links. Products come from the
+  Shopify catalog instead, and places near the user from Google Maps.
 - The agent is always on: it watches the user's feeds (email, calendar, sleep and runs,
   flight status) and speaks first only when something matters, for example a flight delay
   before a meeting. Otherwise it stays quiet.
@@ -33,7 +36,8 @@ and what is demo data, or who made it. Answer in one or two short sentences.
 ## What is real and what is demo data
 
 - Real: the live agent (Claude Sonnet 5.5 inside an ElevenLabs agent with a Thai voice and
-  speech to text), the web search results with their source links, and the pages it draws.
+  speech to text), the web search results with their source links (when the site has a search
+  key), the Shopify product results, the nearby places, and the pages it draws.
 - Demo data: the shopping email from "Mom", FreshMart prices, the U-Card, the delayed TG 102
   flight and the faster FD 3433, the sleep score, the run plan, the Bangkok City 10K and the
   runner "Ploy". No real money moves, no mail is read and nothing is booked.

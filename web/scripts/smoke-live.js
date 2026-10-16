@@ -125,6 +125,25 @@ await step('urgent: bleeding finger shows first aid, no like question', async ()
   await home();
 });
 
+// Only when the server has TAVILY_API_KEY and the agent was synced with the web_search tool.
+const searchOn = (await (await page.request.get(`${BASE}/api/health`)).json()).search;
+if (searchOn) {
+  await step('web search: the agent searches, then draws a page with source links', async () => {
+    await quiet();
+    await type('หางานวิ่ง 10K ในกรุงเทพเดือนหน้าให้หน่อย');
+    await until(async () => (await scene()) === 'generated' && (await page.locator('[data-testid=g-sources] a').count()) > 0, 60000, 'page with sources');
+    const hrefs = await page.locator('[data-testid=g-sources] a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+    const bad = hrefs.find((h) => !/^https?:\/\//.test(h));
+    if (bad) throw new Error(`bad source link ${bad}`);
+    console.log(`   ${hrefs.length} sources, first: ${hrefs[0]}`);
+    await quiet();
+    await page.keyboard.press('Escape');
+    await home();
+  });
+} else {
+  console.log('-- web search step skipped: no TAVILY_API_KEY on the server');
+}
+
 await step('always-on: a flight delay feed event makes the agent open the flight card', async () => {
   await quiet();
   if ((await scene()) !== 'home') throw new Error(`a closed page came back: ${await scene()}`);

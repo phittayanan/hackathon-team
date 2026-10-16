@@ -17,6 +17,7 @@ import { join, dirname, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadEnv } from '../lib/env.js';
 import { agentConfig, toolConfigs, AGENT_NAME, knowledgeText, KNOWLEDGE_NAME, pageAgentConfig, PAGE_AGENT_NAME } from '../agent/config.js';
+import { searchReady } from '../lib/search.js';
 import { parseKeys, findAgentId, maskKey } from '../lib/accounts.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -75,7 +76,9 @@ async function knownTools(call, agentId) {
 
 async function syncTools(call, known, log) {
   const ids = {};
-  for (const tool of toolConfigs()) {
+  const search = searchReady();
+  log(`web_search tool: ${search ? 'offered' : 'not offered (no TAVILY_API_KEY)'}`);
+  for (const tool of toolConfigs({ search })) {
     const id = known[tool.name];
     if (id) {
       try {
@@ -180,7 +183,7 @@ export async function syncAll(keys, { strict = true, fetchImpl = fetch, log = co
 
 async function main() {
   if (process.argv.includes('--dry-run')) {
-    console.log(JSON.stringify({ tools: toolConfigs(), agent: agentConfig({ toolIds: ['<tool ids>'], knowledgeId: '<knowledge id>' }), pageAgent: pageAgentConfig() }, null, 2));
+    console.log(JSON.stringify({ tools: toolConfigs({ search: searchReady() }), agent: agentConfig({ toolIds: ['<tool ids>'], knowledgeId: '<knowledge id>' }), pageAgent: pageAgentConfig() }, null, 2));
     return;
   }
   const keys = parseKeys(process.env);

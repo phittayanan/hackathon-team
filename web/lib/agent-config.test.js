@@ -17,9 +17,10 @@ test('agent config: Claude Sonnet 5.5, Thai, v3 conversational voice, private', 
 });
 
 test('client tools match the browser handlers and are JSON-schema objects', () => {
-  const tools = toolConfigs();
+  const tools = toolConfigs({ search: true });
   assert.deepEqual(tools.map((t) => t.name), TOOL_DEFS.map((t) => t.name));
-  // General web search is removed from the agent.
+  assert.equal(tools.find((t) => t.name === 'web_search').response_timeout_secs, 20);
+  // Without a search key the web_search tool is not offered.
   assert.deepEqual(toolConfigs().map((t) => t.name), toolDefs().map((t) => t.name));
   assert.equal(toolConfigs().some((t) => t.name === 'web_search'), false);
   for (const t of tools) {

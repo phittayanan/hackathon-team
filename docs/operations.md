@@ -17,7 +17,8 @@ found by name:
 
 The key needs the Agents permission (scope `convai_write`). Run a sync after
 every change to `web/agent/prompt.md`, `web/agent/knowledge.md`, the tools in
-`web/public/js/agent-tools.js` or `web/agent/config.js`.
+`web/public/js/agent-tools.js` or `web/agent/config.js`. The `web_search` tool
+is synced only when `TAVILY_API_KEY` is set.
 
 ```text
 npm run agent:sync -- --dry-run   # show what would be sent
@@ -44,6 +45,10 @@ Playwright covers only the no-key path and a stubbed agent.
 2. Tap "สัปดาห์นี้ยุ่งมาก". `<body>` should show `data-brain="agent"`, the
    agent should answer in Thai, and the shopping list should open.
 3. On the payment card, say "จ่ายเลย". It must not pay.
+4. With `TAVILY_API_KEY` set (and `agent:sync` run after it), type
+   "หางานวิ่ง 10K ในกรุงเทพเดือนหน้าให้หน่อย". A generated page should open
+   with real races and a **Sources** list of `http(s)` links under it.
+   `npm run smoke:live` checks the same.
 
 The browser's own speech recognition (Thai) needs Chrome on `localhost` or
 HTTPS.
@@ -79,6 +84,7 @@ needed. One-time steps for the captain:
    ```text
    npx vercel env add ELEVENLABS_API_KEYS production
    npx vercel env add GOOGLE_MAPS_API_KEY production
+   npx vercel env add TAVILY_API_KEY production
    ```
 
    Use the same values as in `.env`. For an exact daily limit across

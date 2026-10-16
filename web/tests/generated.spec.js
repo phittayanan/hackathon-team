@@ -176,6 +176,19 @@ test('design brief: the block page shows at once, then the model page swaps in (
   await expect(page.locator('[data-testid=g-html] .num')).toContainText('62%');
 });
 
+test('web search sources: the page model never gets them; the app draws the links under the model page', async ({ page }) => {
+  const calls = await stubPage(page, PAGES.beach);
+  await home(page);
+  // The spec as render_ui passes it: validated, so only http(s) links are left (see lib/search.test.js).
+  const sources = { type: 'sources', items: [{ title: 'Bangkok 10K', url: 'https://run.example/bkk' }, { title: 'Race news', url: 'http://news.example/10k' }] };
+  await openWithBrief(page, { ...SPEC, blocks: [...SPEC.blocks, sources] });
+  await expect(scene(page)).toHaveAttribute('data-view', 'html');
+  expect(calls[0].spec.blocks.some((b) => b.type === 'sources')).toBe(false);
+  const links = page.locator('[data-testid=g-sources] a');
+  await expect(links).toHaveCount(2);
+  expect(await links.evaluateAll((as) => as.map((a) => a.getAttribute('href')))).toEqual(['https://run.example/bkk', 'http://news.example/10k']);
+});
+
 test('model page: a <script> and an onclick are removed; the page still shows and nothing runs', async ({ page }) => {
   const evil = PAGES.beach
     .replace('</head>', '<script>window.__pwned = 1</script></head>')
