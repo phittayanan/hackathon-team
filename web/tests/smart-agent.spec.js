@@ -137,3 +137,17 @@ test('learning: a revise in one visit reaches the next session as {{learned}}; ?
   await expect(page.locator('body')).toHaveAttribute('data-ready', '1');
   expect(await page.evaluate(() => [localStorage.getItem('agentos.learned'), localStorage.getItem('agentos.memory')])).toEqual([null, null]);
 });
+
+test('training: the race form waits for a yes; decline leaves it unsent, scene_action confirm sends it', async ({ page }) => {
+  await stubLive(page);
+  await connect(page);
+  expect(await tool(page, 'open_scene', { scene: 'training' })).toMatch(/waits for the user's yes/);
+  await expect(page.locator('[data-testid=race-submit]')).toBeEnabled();
+  await tool(page, 'scene_action', { action: 'decline' });
+  await page.waitForTimeout(1200);
+  await expect(page.locator('[data-testid=race-done]')).toBeHidden();
+  await expect(page.locator('body')).toHaveAttribute('data-scene', 'training');
+  await tool(page, 'scene_action', { action: 'confirm' });
+  await expect(page.locator('[data-testid=race-done]')).toBeVisible();
+  await expect(page.locator('.confetti i').first()).toBeAttached();
+});

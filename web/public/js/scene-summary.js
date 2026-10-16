@@ -61,7 +61,7 @@ export function trainingSummary(data = {}) {
   const week = plan.map((p) => `${p.day} ${p.run} at ${p.pace}`).join(', ');
   return clip(
     `Sleep score ${data.sleepScore}, ${data.sleepHours} asleep, resting ${data.restingHr} bpm. ` +
-    `This week: ${week}. Race: ${race.name}, ${race.date}, ${race.place}, ${race.entry}; the sign-up form fills and submits itself.`,
+    `This week: ${week}. Race: ${race.name}, ${race.date}, ${race.place}, ${race.entry}; the sign-up form fills itself but is not sent: it waits for the user's yes (they tap Submit, or say yes and you call scene_action confirm).`,
   );
 }
 
