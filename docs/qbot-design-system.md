@@ -61,7 +61,8 @@ Use a stronger violet gradient for primary actions and a pearl-white-to-lavender
 ## Motion and states
 
 - Use ease-out transitions around 180–250ms for hover, press, and focus feedback.
-- Use 500–700ms for the home reveal and full-screen scene movement. The home shortcuts and composer appear after the first greeting starts.
+- Use 500–700ms for the home reveal. The home shortcuts and composer appear after the first greeting starts.
+- Scene motion (`--grow`, `--fold` in `app.css`): a scene grows out of the mascot in about 520ms on an ease-out curve, and the home steps back (smaller, dimmer) behind it. Its blocks fade up one after another, only right after it opens. Scene to scene is a short crossfade with a small lift, not a full-screen slide. Folding back home is quicker, about 380ms.
 - Keep the mascot at a stable size while voice text appears or disappears. Let the subtitle fade without changing the wordmark or mascot scale.
 - Respect `prefers-reduced-motion`; remove decorative animation and transitions for users who request reduced motion.
 - Use `:hover` for a small lift or brightness change and `:active` for a slight scale-down. Avoid large bounces.
