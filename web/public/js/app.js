@@ -68,13 +68,16 @@ export function openScene(name, data = {}) {
   logEvent('scene_open', { name, swap: Boolean(open) });
   if (open) {
     open.ctl.destroy?.();
-    // Scene to scene: the old one slides up, the new one rises under it.
+    // Scene to scene: the old one fades and lifts, the new one fades up over it.
     const old = open.el;
     old.classList.add('leaving');
-    setTimeout(() => old.remove(), T(650));
+    setTimeout(() => old.remove(), T(450));
     el.classList.add('entering');
   } else {
     stage.classList.add('open');
+    // Its blocks fade up one by one while it grows; redraws after that do not animate.
+    el.classList.add('fresh');
+    setTimeout(() => el.classList.remove('fresh'), T(900));
   }
   stage.appendChild(el);
   document.body.classList.remove('thinking');
@@ -97,7 +100,7 @@ export function closeScene() {
   stage.classList.remove('open');
   document.body.classList.remove('scene-open');
   document.body.dataset.scene = 'home';
-  setTimeout(() => el.remove(), T(750));
+  setTimeout(() => el.remove(), T(450));
 }
 
 // Speak first, then act: the agent starts its sentence about what it will do, and the scene

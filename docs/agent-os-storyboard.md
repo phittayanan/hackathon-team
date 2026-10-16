@@ -1,5 +1,10 @@
 # Agent OS demo storyboard
 
+> **Being replanned (2026-10-16).** This is the stage plan of 2026-10-15.
+> There is no live pitch any more, and the demo video is being replanned.
+> What is built now: [build-parts.md](build-parts.md). How to run the app:
+> [README](../README.md).
+
 Confirmed by the team lead on 2026-10-15. Built in `web/` (issue #17).
 
 The team changed the demo from CryptoMate to an **Agent OS**: you talk to an

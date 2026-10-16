@@ -15,7 +15,45 @@ Copy this block for a new decision:
 - **Who decided:** names, or "whole team".
 ```
 
+## 2026-10-16: Docs match the demo
+
+- **Decision:** The product is written as "Q-Bot, an Agent OS demo". The
+  money safety rules in `AGENTS.md` describe the demo as it is: rules check
+  in code, Allow is a button only, no real money, no keys in the repo. The
+  CryptoMate folder plan, Chrome setup and U-topia rules move to
+  [archive/cryptomate/](archive/cryptomate/README.md), with the price test.
+  Team operations (deploy, agent sync, run log) move from the README to
+  [operations.md](operations.md).
+- **Why:** The docs had drifted from the code: they named folders that never
+  existed, a web search that was removed and an agent name that changed.
+- **Who decided:** phittayanan
+
+## 2026-10-16: Shopify product search instead of Tavily web search
+
+- **Decision:** The `web_search` tool (Tavily) is removed. The live agent
+  finds products through Shopify Global Catalog instead
+  ([notes](../web/SHOPIFY-CATALOG.md)). There is no general web search.
+- **Why:** osizk was building an agent that helps people shop, first with
+  Tavily for the shopping search (issue #32), then moved it to Shopify. The
+  general `web_search` tool (pull request #20) used the same Tavily code, so
+  it went out with it, not by a decision of its own. The change is commit
+  `794e172`, merged in pull request #38.
+- **Who decided:** osizk
+- **Update (pull request #60):** a general `web_search` tool is back for
+  current facts (events, prices, news). It is optional (`TAVILY_API_KEY`).
+  Products still come from Shopify.
+
+## 2026-10-16: Pictures made ahead of time
+
+- **Decision:** Pictures in generated pages come from a fixed set in
+  `web/public/pics/`, picked by keyword. No image API call.
+- **Why:** The ElevenLabs image API used about 18% of the credit
+  (`web/lib/images.js`). Pull request #31.
+- **Who decided:** not recorded
+
 ## 2026-10-16: Judges try the demo alone
+
+> Partly superseded: Tavily web search was removed (see "Shopify product search instead of Tavily web search").
 
 - **Decision:** There is no live pitch. Judges get the pitch deck, the source
   and a Vercel link, and they try the demo with nobody from the team there.
@@ -44,6 +82,8 @@ Copy this block for a new decision:
 - **Who decided:** head (team lead)
 
 ## 2026-10-15: Pictures in generated pages
+
+> Superseded by "Pictures made ahead of time" (2026-10-16).
 
 - **Decision:** Generated pages can have an image part with a short prompt.
   The page shows a grey frame at once; the server asks the ElevenLabs Image &
@@ -112,6 +152,8 @@ Copy this block for a new decision:
 
 ## 2026-10-15: Agent OS storyboard
 
+> Partly superseded: the home now has a text box and suggestions, and there is no live pitch (2026-10-16). The demo plan is being replanned.
+
 - **Decision:** Agent home, then four scenes: shopping list from email,
   payment card, training with race sign-up, flight delay. Every scene grows
   out of the home and folds back. The home has no chat history and no text
@@ -135,6 +177,8 @@ Copy this block for a new decision:
 
 ## 2026-10-15: Product is CryptoMate
 
+> Superseded by the pivot to Agent OS (2026-10-15). Notes kept in [archive/cryptomate/](archive/cryptomate/README.md).
+
 - **Decision:** We build CryptoMate, "เพื่อนคู่ใจที่ดูแลเงิน crypto ของคุณ
   ให้ง่ายและปลอดภัย" - a friend that keeps your crypto money easy and safe.
   A web app is the main product. LINE is connected later if time allows.
@@ -143,6 +187,8 @@ Copy this block for a new decision:
 - **Who decided:** head (team lead)
 
 ## 2026-10-15: App flow
+
+> Superseded by the pivot to Agent OS (2026-10-15). Notes kept in [archive/cryptomate/](archive/cryptomate/README.md).
 
 - **Decision:** The user types what they want. The agent shows a marketplace
   list labelled 1, 2, 3. The user picks one. A detail view compares price and
@@ -153,6 +199,8 @@ Copy this block for a new decision:
 - **Who decided:** head (team lead)
 
 ## 2026-10-15: Our own crypto payment assistant pays, with rules and approve
+
+> Superseded by the pivot to Agent OS (2026-10-15). Notes kept in [archive/cryptomate/](archive/cryptomate/README.md).
 
 - **Decision:** Payment goes through our own crypto payment assistant. Before
   every payment it checks rules in plain code, not by the model: monthly
@@ -167,6 +215,8 @@ Copy this block for a new decision:
 
 ## 2026-10-15: Tech stack
 
+> Superseded by the pivot to Agent OS (2026-10-15). Notes kept in [archive/cryptomate/](archive/cryptomate/README.md).
+
 - **Decision:** Agent base loop: Pi v1.2.0
   (`@earendil-works/pi-coding-agent@1.2.0`) on Node. Browser: Playwright as a
   library, attached by CDP to a dedicated Chrome profile the owner logged in
@@ -180,6 +230,8 @@ Copy this block for a new decision:
 
 ## 2026-10-15: Money story
 
+> Superseded by the pivot to Agent OS (2026-10-15). Notes kept in [archive/cryptomate/](archive/cryptomate/README.md).
+
 - **Decision:** A 0.5-1% fee per purchase now. Later, sell the rules engine as
   an API to agent builders. On stage the fee is shown on a slide only; no real
   fee is taken.
@@ -188,6 +240,8 @@ Copy this block for a new decision:
 - **Who decided:** head (team lead)
 
 ## 2026-10-15: Demo story
+
+> Superseded by the pivot to Agent OS (2026-10-15). Notes kept in [archive/cryptomate/](archive/cryptomate/README.md).
 
 - **Decision:** Three beats. First, one real small buy of a physical item
   from a real online shop, paid with the U-Card (candidate: NaRaYa on Shopify,

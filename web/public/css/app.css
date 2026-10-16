@@ -13,7 +13,11 @@
   --glass-surface: linear-gradient(155deg, rgba(255, 255, 255, .91) 0%, rgba(235, 225, 248, .76) 48%, rgba(199, 179, 225, .65) 100%);
   --glass-shadow: 0 8px 20px rgba(49, 28, 87, .17), inset 0 1px 1px rgba(255, 255, 255, .95), inset 0 -1px 1px rgba(107, 77, 150, .16);
   --radius: 22px;
-  --grow: 700ms;
+  /* Scene motion: grow fast and settle (ease-out); fold back a bit quicker, speeding into the mascot. */
+  --grow: 520ms;
+  --fold: 380ms;
+  --ease-grow: cubic-bezier(.22, 1, .36, 1);
+  --ease-fold: cubic-bezier(.5, 0, .2, 1);
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Segoe UI Variable Text", "Segoe UI", "Thonburi", "Leelawadee UI", sans-serif;
   --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro", "Segoe UI Variable Display", "Segoe UI", "Thonburi", "Leelawadee UI", sans-serif;
 }
@@ -77,8 +81,8 @@ body {
   font-optical-sizing: auto;
   user-select: none;
 }
-body.test { --grow: 40ms; }
-body.test *, body.test *::before, body.test *::after { animation-duration: 40ms !important; transition-duration: 40ms !important; }
+body.test { --grow: 40ms; --fold: 40ms; }
+body.test *, body.test *::before, body.test *::after { animation-duration: 40ms !important; animation-delay: 0s !important; transition-duration: 40ms !important; }
 
 /* Phone frame on a laptop; full screen on a phone. */
 .phone {
@@ -216,14 +220,25 @@ body.scene-open .home-btn { display: block; }
   position: absolute; inset: 0; z-index: 20; overflow: hidden;
   background: var(--card);
   clip-path: circle(0% at 50% 42%);
-  transition: clip-path var(--grow) cubic-bezier(.7, 0, .2, 1);
+  transition: clip-path var(--fold) var(--ease-fold);
   pointer-events: none;
 }
-.stage.open { clip-path: circle(140% at 50% 42%); pointer-events: auto; }
-.scene { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px 22px 24px; transition: transform .6s cubic-bezier(.7, 0, .2, 1), opacity .6s; }
-.scene.leaving { transform: translateY(-100%); opacity: .4; }
-.scene.entering { animation: rise .6s cubic-bezier(.7, 0, .2, 1); }
-@keyframes rise { from { transform: translateY(100%); } to { transform: none; } }
+.stage.open { clip-path: circle(140% at 50% 42%); pointer-events: auto; transition: clip-path var(--grow) var(--ease-grow); }
+/* The home steps back while a scene covers it, and comes forward again on the fold. */
+.home { transform-origin: 50% 42%; transition: transform var(--fold) var(--ease-fold), opacity var(--fold) var(--ease-fold); }
+body.scene-open .home { transform: scale(.94); opacity: .5; transition-duration: var(--grow); transition-timing-function: var(--ease-grow); }
+.scene { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px 22px 24px; transition: transform .3s ease-in, opacity .3s ease-in; }
+/* Scene to scene: the old one fades and lifts a little, the new one fades up over it. */
+.scene.leaving { transform: translateY(-24px) scale(.98); opacity: 0; pointer-events: none; }
+.scene.entering { animation: rise .42s var(--ease-grow) .06s both; }
+@keyframes rise { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
+/* Just after a scene opens, its blocks fade up one after another. Later redraws do not animate. */
+.scene.fresh > * { animation: rise-in .45s var(--ease-grow) both; animation-delay: .12s; }
+.scene.fresh > :nth-child(2) { animation-delay: .17s; }
+.scene.fresh > :nth-child(3) { animation-delay: .22s; }
+.scene.fresh > :nth-child(4) { animation-delay: .27s; }
+.scene.fresh > :nth-child(5) { animation-delay: .32s; }
+.scene.fresh > :nth-child(n+6) { animation-delay: .36s; }
 
 .eyebrow { margin: 6px 0 4px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; }
 .btn {
