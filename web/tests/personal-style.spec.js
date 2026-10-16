@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { home } from './helpers.js';
+import { home, say } from './helpers.js';
 
 // The user's own design system (public/js/style.js): the block page follows it, the page model gets
 // it as one line, and the memory page shows and changes it. /api/page is stubbed: no page model call.
@@ -73,7 +73,7 @@ test('the /api/page request carries the style line', async ({ page }) => {
 test('memory page: change size and accent, see the preview and storage change, then reset', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await home(page);
-  await page.getByTestId('memory-entry').click();
+  await say(page, 'agent จำอะไรไว้');
   const group = page.locator('#stage .scene-memory').getByTestId('mem-style');
   const preview = group.getByTestId('style-preview');
   await expect(group).toContainText('สไตล์ของคุณ');
@@ -108,7 +108,7 @@ test('memory page: change size and accent, see the preview and storage change, t
 test('memory page: "Forget everything" also resets the style', async ({ page }) => {
   await seedStyle(page, LARGE_TEAL);
   await home(page);
-  await page.getByTestId('memory-entry').click();
+  await say(page, 'agent จำอะไรไว้');
   const scene = page.locator('#stage .scene-memory');
   await scene.getByTestId('forget-all').click(); // a style alone is something to forget
   await scene.getByTestId('forget-all-yes').click();
@@ -121,7 +121,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 
     await page.setViewportSize(viewport);
     await seedStyle(page, { ...LARGE_TEAL, size: 'xlarge', density: 'compact', contrast: 'high', charts: 'ok' });
     await home(page);
-    await page.getByTestId('memory-entry').click();
+    await say(page, 'agent จำอะไรไว้');
     await expect(page.locator('body')).toHaveAttribute('data-scene', 'memory');
     await page.waitForTimeout(800);
     const faults = await page.evaluate(() => {

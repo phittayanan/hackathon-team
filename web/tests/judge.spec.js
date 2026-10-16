@@ -3,11 +3,11 @@ import { home, say, expectHome } from './helpers.js';
 
 // A judge alone: no presenter, no keys. What this is, sentences to tap, a text input, a way home.
 
-test('after greeting: Q-Bot, three secretary shortcuts, the input next to the mic, no presenter controls', async ({ page }) => {
+test('after greeting: Q-Bot, three suggestions, the input next to the mic, no buttons or presenter controls', async ({ page }) => {
   await home(page);
   await expect(page.locator('[data-testid=intro]')).toContainText('Q-Bot');
-  await expect(page.locator('[data-testid=suggest]')).toHaveCount(0);
-  await expect(page.locator('.secretary-shortcuts button')).toHaveCount(3);
+  await expect(page.locator('[data-testid=suggest] button')).toHaveCount(3);
+  await expect(page.locator('.secretary-shortcuts, [data-testid=shopify-catalog], [data-testid=memory-entry]')).toHaveCount(0);
   await expect(page.locator('[data-testid=composer] #mic')).toBeVisible();
   await expect(page.locator('#fallbackInput')).toBeVisible();
   await expect(page.locator('[data-testid=presenter]')).toHaveCount(0);

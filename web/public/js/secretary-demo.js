@@ -1,6 +1,6 @@
 import { NOTICE_TYPES } from './secretary.js';
 
-export function setupSecretaryDemo(store, { open, reset }) {
+export function setupSecretaryDemo(store, { reset }) {
   const make = (tag, text, cls) => {
     const el = document.createElement(tag);
     if (text) el.textContent = text;
@@ -12,9 +12,6 @@ export function setupSecretaryDemo(store, { open, reset }) {
     el.type = 'button'; el.dataset.testid = id; el.onclick = action;
     return el;
   };
-  const shortcuts = make('section', null, 'secretary-shortcuts');
-  shortcuts.setAttribute('aria-label', 'เลขาส่วนตัว');
-  const actions = make('div', null, 'secretary-actions');
   const dialog = make('dialog', null, 'secretary-demo');
   dialog.id = 'secretary-demo'; dialog.setAttribute('aria-labelledby', 'demo-title');
   const title = make('h2', 'ทดสอบการแจ้งเตือน'); title.id = 'demo-title';
@@ -34,9 +31,8 @@ export function setupSecretaryDemo(store, { open, reset }) {
   }, 'schedule-notice'), button('รีเซ็ตเดโม', () => {
     reset(); feedback.textContent = ''; dialog.close();
   }, 'reset-secretary'), button('ปิด', () => dialog.close(), 'close-demo'));
-  actions.append(button('สรุปวันนี้', () => open('today'), 'secretary-today'), button('อีเมล → งาน', () => open('email'), 'secretary-email'), button('ทดสอบการแจ้งเตือน', () => { feedback.textContent = ''; dialog.showModal(); }, 'secretary-demo'));
-  shortcuts.append(actions);
-  document.getElementById('home').append(shortcuts);
   document.getElementById('phone').append(dialog);
-
+  // No buttons on the home screen: the agent opens today and email (secretary_action); the team
+  // opens this test dialog with the presenter hotkey n.
+  return { show: () => { feedback.textContent = ''; dialog.showModal(); } };
 }

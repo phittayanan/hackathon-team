@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { home, expectHome, say } from './helpers.js';
+import { home, expectHome, say, openSecretary, openNoticeTest } from './helpers.js';
 
 test('today, email tasks and completion share state without duplicating appointments', async ({ page }) => {
   await home(page);
-  await page.getByTestId('secretary-email').click();
+  await openSecretary(page, 'email');
   await expect(page.locator('.secretary-title')).toHaveText('จากอีเมลเป็นงาน');
   await expect(page.locator('.secretary-badge')).toHaveCount(0);
   await page.getByTestId('import-email').click();
@@ -17,7 +17,7 @@ test('today, email tasks and completion share state without duplicating appointm
 
 test('meeting alert proposes a free slot and sends only on explicit test-send tap', async ({ page }) => {
   await home(page);
-  await page.getByTestId('secretary-demo').click();
+  await openNoticeTest(page);
   await page.getByTestId('schedule-notice').click();
   await expect(page.getByTestId('notification-card')).toBeVisible();
   await expect(page.locator('.secretary-conflict')).toContainText('ประชุมทีม');
@@ -38,7 +38,7 @@ test('meeting alert proposes a free slot and sends only on explicit test-send ta
 
 test('alerts wait behind a task, snooze and reset; ordinary email never opens a scene', async ({ page }) => {
   await home(page);
-  await page.getByTestId('secretary-today').click();
+  await openSecretary(page, 'today');
   await page.evaluate(() => window.agentOS.secretary.schedule('deadline'));
   await page.waitForTimeout(650);
   await expect(page.locator('.scene-secretary')).toHaveAttribute('data-view', 'today');
@@ -47,10 +47,10 @@ test('alerts wait behind a task, snooze and reset; ordinary email never opens a 
   await page.getByTestId('snooze-1').click();
   await expectHome(page);
   expect(await page.evaluate(() => window.agentOS.secretary.get().notices[0].status)).toBe('scheduled');
-  await page.getByTestId('secretary-demo').click();
+  await openNoticeTest(page);
   await page.getByTestId('reset-secretary').click();
   expect(await page.evaluate(() => window.agentOS.secretary.get().notices)).toEqual([]);
-  await page.getByTestId('secretary-demo').click();
+  await openNoticeTest(page);
   await page.getByRole('combobox', { name: 'เหตุการณ์' }).selectOption('email');
   await page.getByTestId('schedule-notice').click();
   await page.waitForTimeout(650);
@@ -61,12 +61,12 @@ test('alerts wait behind a task, snooze and reset; ordinary email never opens a 
 for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }]) {
   test(`secretary controls remain reachable at ${viewport.width}x${viewport.height}`, async ({ page }) => {
     await page.setViewportSize(viewport); await home(page);
-    await page.getByTestId('secretary-demo').click();
+    await openNoticeTest(page);
     await expect(page.locator('dialog')).toBeVisible();
     await page.getByRole('combobox', { name: 'แจ้งเมื่อ' }).selectOption('10');
     await page.getByTestId('schedule-notice').click();
     expect(await page.evaluate(() => window.agentOS.secretary.get().notices[0].status)).toBe('scheduled');
-    await page.getByTestId('secretary-email').click();
+    await openSecretary(page, 'email');
     await page.getByTestId('import-email').click();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     const footer = await page.locator('.interaction-panel').boundingBox();

@@ -3,9 +3,9 @@ import { home, say, expectHome } from './helpers.js';
 
 const product = { id: 'p1', title: '<script>alert(1)</script>', seller: 'Real merchant', amount: 99900, currency: 'THB', description: 'Wireless headphones', url: 'https://merchant.example/products/headphones', image: null };
 
-test('only Shopify discovery is offered and the removed web search API is unavailable', async ({ page, request }) => {
+test('no shop button on the home; only Shopify discovery is offered and the removed web search API is unavailable', async ({ page, request }) => {
   await home(page);
-  await expect(page.getByTestId('shopify-catalog')).toBeVisible();
+  await expect(page.getByTestId('shopify-catalog')).toHaveCount(0);
   await expect(page.getByTestId('shopping-search')).toHaveCount(0);
   expect((await request.post('/api/search', { data: { query: 'headphones' } })).status()).toBe(404);
 });
@@ -32,7 +32,8 @@ test('Shopify empty results and errors are visible and retryable on a small phon
   let calls = 0;
   await page.route('**/api/catalog', (route) => route.fulfill({ json: ++calls === 1 ? { products: [] } : { error: 'Shopify rate limited' } }));
   await page.setViewportSize({ width: 320, height: 568 });
-  await home(page); await page.getByTestId('shopify-catalog').click();
+  // No button: the agent opens the catalog (open_scene shopping with {"catalog":true}).
+  await home(page); await page.evaluate(() => window.agentOS.openScene('shopping', { catalog: true }));
   await page.getByLabel('อยากได้สินค้าแบบไหน').fill('shoes');
   await page.getByRole('button', { name: 'ค้นสินค้า', exact: true }).click();
   await expect(page.locator('.scene-shopping [role=status]')).toContainText('ยังไม่พบสินค้า');

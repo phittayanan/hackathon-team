@@ -242,6 +242,23 @@ test('live: a blocked mic says offline mode in one line; a typed request still o
   expect(home.y).toBeGreaterThanOrEqual(notice.y + notice.height);
 });
 
+test('live: a mic prompt nobody answers does not swallow typed text; the offline brain answers', async ({ page }) => {
+  // Typing starts the live agent, which asks for the mic. A judge who only types may never answer.
+  await page.addInitScript(() => { navigator.mediaDevices.getUserMedia = () => new Promise(() => {}); });
+  await page.route('**/api/health', (r) => r.fulfill({ json: { brain: 'elevenlabs-agent', tts: false } }));
+  await page.route('**/api/agent/session', (r) => r.fulfill({ json: { live: true, signedUrl: 'wss://example.invalid/fake' } }));
+  await page.route('https://cdn.jsdelivr.net/npm/@elevenlabs/client@*/+esm', (r) => r.fulfill({ contentType: 'text/javascript', body: FAKE_SDK }));
+  await page.goto('/?test=1');
+  await expect(page.locator('body')).toHaveAttribute('data-brain', 'agent-ready');
+  await page.locator('#fallbackInput').fill('ช่วยทำ to-do list ให้หน่อย');
+  await page.locator('#fallbackInput').press('Enter');
+  // The typed words show at once, while the live agent is still starting.
+  await expect(page.locator('#subtitle')).toContainText('to-do list', { timeout: 1000 });
+  await expect(page.locator('body')).toHaveClass(/thinking/);
+  // The page does not wait for the mic forever: the offline brain answers.
+  await expect(page.locator('body')).toHaveAttribute('data-scene', 'generated', { timeout: 10_000 });
+});
+
 test('live: the mascot thinks from a typed request until the agent answers', async ({ page }) => {
   await liveHome(page);
   await page.locator('#fallbackInput').fill('หางานวิ่ง 10K');

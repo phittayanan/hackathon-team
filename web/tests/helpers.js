@@ -25,3 +25,8 @@ export async function expectHome(page) {
   await expect(page.locator('#stage')).not.toHaveClass(/open/);
   await expect(page.locator('#stage .scene')).toHaveCount(0);
 }
+
+// The home screen has no buttons: the agent opens the secretary views (secretary_action), and the
+// team opens the notification test with the presenter hotkey n. Same calls as those paths.
+export const openSecretary = (page, view) => page.evaluate((v) => window.agentOS.openScene('secretary', { view: v }), view);
+export const openNoticeTest = (page) => page.evaluate(() => window.agentOS.noticeTest());

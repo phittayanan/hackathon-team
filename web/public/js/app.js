@@ -110,6 +110,27 @@ async function sayThenOpen({ line, text }, name, data, current = () => true) {
   return show;
 }
 
+// What the agent offers after its greeting: one tap sends it as the user's own words (live agent or
+// offline router). Together they cover the demo: shopping list from email and pay, training and race
+// sign-up, a generated to-do list. The flight delay comes from the agent itself (always-on feed).
+export const SUGGESTIONS = [
+  { say: 'สัปดาห์นี้ยุ่งมาก', kind: 'shopping' },
+  { say: 'วางแผนซ้อมวิ่ง 10K', kind: 'training' },
+  { say: 'ทำ to-do list ให้หน่อย', kind: 'generated' },
+];
+
+function setupSuggestions() {
+  const nav = $('suggest');
+  for (const s of SUGGESTIONS) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'g-chip';
+    btn.dataset.kind = s.kind;
+    btn.textContent = s.say;
+    btn.addEventListener('click', () => { logEvent('suggestion', { kind: s.kind }); submitText(s.say, 'suggestion'); });
+    nav.append(btn);
+  }
+}
 
 // The agent speaks first (always-on feed event offline, or a presenter hotkey).
 async function proactive(name) {
@@ -199,12 +220,24 @@ export async function handleUserText(text) {
   if (res.say) await speak({ line: res.line, text: res.say });
 }
 
+// Starting the live agent asks for the mic. A judge who only types may never answer that prompt:
+// after this long the typed text goes to the offline brain instead of waiting for it forever.
+const LIVE_START_WAIT_MS = 8000;
+
 // What the user typed or tapped: same path as speech. Starts the live agent first if it can.
 async function submitText(text, via) {
   text = String(text || '').trim();
   if (!text) return;
   logEvent('user_text', { text, via });
-  if (live.available && !live.connected) await startLive(toolUi).catch(() => {});
+  // The user is already talking: no greeting after this.
+  greeted = true;
+  document.body.classList.add('started');
+  if (live.available && !live.connected) {
+    // Show the words at once: the signed URL, the SDK and the mic take a moment.
+    showSubtitle(`“${text}”`, 0);
+    document.body.classList.add('thinking');
+    await Promise.race([startLive(toolUi).catch(() => {}), wait(LIVE_START_WAIT_MS)]);
+  }
   handleUserText(text);
 }
 
@@ -224,16 +257,13 @@ function setupFallback() {
 }
 
 function setupHomeButton() {
-  $('catalogBtn').addEventListener('click', () => openScene('shopping', { catalog: true }));
-  // The memory page: no talking needed to see or change what the agent remembers.
-  $('memoryEntry').addEventListener('click', () => openScene('memory'));
   $('homeBtn').addEventListener('click', () => closeScene());
 }
 
 // Escape always folds back home. Presenter hotkeys only with ?presenter=1 (not while typing):
-// / text input, f flight, t training, s shopping, p payment, h home.
+// / text input, f flight, t training, s shopping, p payment, m memory page, n notification test, h home.
 // The always-on agent opens flight and training by itself; f and t are a last-resort fallback.
-function setupHotkeys(fallback) {
+function setupHotkeys(fallback, noticeTest) {
   window.addEventListener('keydown', (e) => {
     if (e.target.closest('input, textarea, select, dialog') || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
     const actions = {
@@ -245,6 +275,8 @@ function setupHotkeys(fallback) {
         t: () => proactive('training'),
         s: () => proactive('shopping'),
         p: () => proactive('payment'),
+        m: () => openScene('memory'),
+        n: () => noticeTest.show(),
         h: () => closeScene(),
       } : {}),
     };
@@ -311,11 +343,11 @@ export const SESSION_START = '[session start] The user just opened the app again
 // The saved greet line (same voice as the live agent, whose first message is empty), so there is
 // exactly one greeting whether or not the live agent connects later; a returning visitor is
 // greeted by the live agent instead (it knows their name and last task).
+let greeted = false; // also set when the user types first (submitText)
 function setupGreeting() {
-  let greeted = false;
   const first = (e) => {
     if (greeted) return;
-    if (e.target.closest?.('#mic, input, form, .presenter, .language-switch, .shopping-shortcut, .memory-entry, .home-btn, .secretary-shortcuts, dialog') || (e.type === 'keydown' && e.key !== 'Enter')) return;
+    if (e.target.closest?.('#mic, input, form, .presenter, .language-switch, .home-btn, .suggest, dialog') || (e.type === 'keydown' && e.key !== 'Enter')) return;
     greeted = true;
     window.removeEventListener('pointerdown', first, true);
     window.removeEventListener('keydown', first, true);
@@ -342,8 +374,12 @@ async function boot() {
   tickClock();
   setInterval(tickClock, 15000);
   const fallback = setupFallback();
+  const noticeTest = setupSecretaryDemo(secretary, {
+    reset: () => { secretary.reset(); interruptAll(); silenceAgent(); closeScene(); fireFeed('reset'); },
+  });
   setupHomeButton();
-  setupHotkeys(fallback);
+  setupSuggestions();
+  setupHotkeys(fallback, noticeTest);
   setupMic(fallback);
   setupGreeting();
   logEvent('page_open', { test: TEST });
@@ -359,13 +395,9 @@ async function boot() {
     if (document.querySelector('dialog[open]') || document.body.classList.contains('thinking') || document.activeElement?.matches('input, textarea, select')) return false;
     return secretary.flush();
   } });
-  setupSecretaryDemo(secretary, {
-    open: (view) => openScene('secretary', { view }),
-    reset: () => { secretary.reset(); interruptAll(); silenceAgent(); closeScene(); fireFeed('reset'); },
-  });
   document.body.dataset.ready = '1';
   // For tests and the presenter console.
-  window.agentOS = { openScene, closeScene, handleUserText, proactive, fireFeed, secretary };
+  window.agentOS = { openScene, closeScene, handleUserText, proactive, fireFeed, secretary, noticeTest: noticeTest.show };
 }
 
 boot();

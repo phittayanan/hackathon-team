@@ -31,6 +31,28 @@
   <link rel="modulepreload" href="/js/agent-tools.js">
   <link rel="modulepreload" href="/js/genui.js">
   <link rel="modulepreload" href="/js/timing.js">
+  <script>
+    // A browser that kept an older app.js or app.css from an earlier deploy next to this page fails at
+    // boot (seen on Safari, 2026-10-16). Fetch the page's own files again past the cache, then reload:
+    // once per tab, so a real bug can never loop.
+    (() => {
+      const heal = () => {
+        if (document.body?.dataset.ready === '1') return;
+        try {
+          if (sessionStorage.getItem('qbot.healed')) return;
+          sessionStorage.setItem('qbot.healed', '1');
+        } catch { return; }
+        const urls = new Set([...document.querySelectorAll('link[rel=stylesheet], link[rel=modulepreload], script[src]')].map((el) => el.href || el.src));
+        for (const e of performance.getEntriesByType('resource')) {
+          const url = new URL(e.name);
+          if (url.origin === location.origin && /^\/(js|css)\//.test(url.pathname)) urls.add(e.name);
+        }
+        Promise.allSettled([...urls].map((u) => fetch(u, { cache: 'reload' }))).then(() => location.reload());
+      };
+      addEventListener('error', heal);
+      addEventListener('unhandledrejection', heal);
+    })();
+  </script>
 </head>
 <body>
   <div class="phone" id="phone">
@@ -52,8 +74,8 @@
         <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
       </div>
       <p class="tap-hint" id="tapHint" data-testid="tap-hint">แตะหน้าจอเพื่อเปิดเสียง · Tap to turn on sound</p>
-      <button class="secretary-button shopping-shortcut" id="catalogBtn" type="button" data-testid="shopify-catalog">เลือกสินค้า · Shopify</button>
-      <button class="memory-entry" id="memoryEntry" type="button" data-testid="memory-entry" aria-label="agent จำอะไรไว้ · What I remember">agent จำอะไรไว้<small>What I remember</small></button>
+      <!-- After the greeting the agent offers a few things to say; a tap sends one as the user. -->
+      <nav class="suggest" id="suggest" data-testid="suggest" aria-label="ลองพูดว่า"></nav>
     </main>
 
     <section class="stage" id="stage" aria-live="polite"></section>
