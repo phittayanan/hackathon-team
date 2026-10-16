@@ -176,6 +176,18 @@ const toolUi = {
   // Kept pages, so the live agent can reopen one by its reference (render_ui {"saved": kind}).
   saved: () => loadSaved(),
   tellAgent: (text) => text && live.connected && sendContext(text),
+  // Web search on the server (Tavily); only when the server has a search key.
+  search: async (query) => {
+    if (!live.search) return { error: 'web search is not set up' };
+    showSubtitle('กำลังค้นเว็บ… · Searching the web…', 0);
+    document.body.classList.add('thinking');
+    const t0 = Date.now();
+    const out = await apiFetch('/api/search', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query }) })
+      .then((res) => (res.ok ? res.json() : { error: `search ${res.status}` }))
+      .catch((err) => ({ error: err.message }));
+    logEvent('search', { query, results: out.results?.length ?? 0, error: out.error || null, ms: Date.now() - t0 });
+    return out;
+  },
 };
 
 // What the user said (voice or fallback text) -> agent action.

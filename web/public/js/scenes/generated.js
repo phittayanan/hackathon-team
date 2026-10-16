@@ -286,6 +286,9 @@ function measurePage(host) {
   return { boxes, viewport: { width: host.clientWidth, height: window.innerHeight, contentWidth: body.scrollWidth, background } };
 }
 
+// The spec for the page model: sources stay with the app, which draws them as real links.
+const withoutSources = (spec) => ({ ...spec, blocks: spec.blocks.filter((b) => b.type !== 'sources') });
+
 export default function mountGenerated(el, data, agent) {
   let fromSaved = false;
   let spec = data.spec;
@@ -334,7 +337,8 @@ export default function mountGenerated(el, data, agent) {
   const look = () => {
     const measured = host?.isConnected && measurePage(host);
     if (!measured) return null;
-    const fails = checkPage(measured.boxes, measured.viewport, spec);
+    // Checked against what the page model got: it never sees the sources.
+    const fails = checkPage(measured.boxes, measured.viewport, withoutSources(spec));
     return { fails, text: describePage(measured.boxes, measured.viewport, fails) };
   };
 
@@ -380,6 +384,9 @@ export default function mountGenerated(el, data, agent) {
       wirePage(host.attachShadow({ mode: 'open' }), agent, pageChanged);
       paint();
       el.append(host);
+      // The page model writes no links: web search sources are drawn by the app, under the page.
+      const sources = spec.blocks.find((b) => b.type === 'sources');
+      if (sources) el.append(drawBlock(sources, spec, () => {}, () => {}));
     } else {
       host = null;
       const title = h('h1', 'g-title', spec.title);
@@ -431,7 +438,7 @@ export default function mountGenerated(el, data, agent) {
       const res = await apiFetch('/api/page', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ spec, design, style: styleText() }),
+        body: JSON.stringify({ spec: withoutSources(spec), design, style: styleText() }),
         signal: stop.signal,
       });
       if (!res.ok || !res.body) throw new Error(`page http ${res.status}`);

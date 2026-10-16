@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 const NO_KEYS = {
   ELEVENLABS_API_KEY: '', ELEVENLABS_AGENT_ID: '', ELEVENLABS_VOICE_ID: '', ELEVENLABS_API_KEYS: '',
-  UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '', KV_REST_API_URL: '', KV_REST_API_TOKEN: '', GOOGLE_MAPS_API_KEY: '',
+  UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '', KV_REST_API_URL: '', KV_REST_API_TOKEN: '', GOOGLE_MAPS_API_KEY: '', TAVILY_API_KEY: '',
 };
 
 // The app must run with no API keys, so the test server gets empty keys.

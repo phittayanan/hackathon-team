@@ -66,7 +66,7 @@ Copy [.env.example](.env.example) to `.env` at the repo root and fill in:
 | --- | --- | --- |
 | `ELEVENLABS_API_KEY` + `ELEVENLABS_AGENT_ID` | The brain is a live ElevenLabs agent (Claude Sonnet 5.5 inside, Thai voice and speech to text). It changes the screen only through client tools: it opens scenes, draws new pages and decides when to speak first | Keywords pick the screen, a to-do request gets one ready-made page, simple rules decide when to speak first |
 | `ELEVENLABS_API_KEYS` | Several teammates' ElevenLabs keys, comma separated, used in order; one out of credit is skipped for the day (see [Add an ElevenLabs account](#add-an-elevenlabs-account)) | The single `ELEVENLABS_API_KEY` account only |
-| `TAVILY_API_KEY` | The agent gets a `web_search` tool (Tavily, free tier, basic search). Results go on a generated page with source links | There is no search tool. Nothing else changes |
+| `TAVILY_API_KEY` | The agent gets a `web_search` tool (Tavily, free tier, fast search) for current facts: events, opening hours, prices, news. Results go on a generated page with `http(s)` source links. Each search counts against the daily `calls` limit; the key stays on the server. Products still come from Shopify, nearby places from Google Maps | There is no search tool. Nothing else changes |
 | `UPSTASH_REDIS_REST_URL` + `_TOKEN` | The daily limit is shared by every Vercel function instance (free Upstash Redis) | The limit is counted in memory: exact locally, best effort on Vercel |
 
 Then run `cd web && npm run agent:sync` once. It creates the agents from
@@ -185,6 +185,10 @@ agent):
 2. Tap "สัปดาห์นี้ยุ่งมาก". `<body>` should show `data-brain="agent"`, the
    agent should answer in Thai, and the shopping list should open.
 3. On the payment card, say "จ่ายเลย". It must not pay.
+4. With `TAVILY_API_KEY` set (and `agent:sync` run after it), type
+   "หางานวิ่ง 10K ในกรุงเทพเดือนหน้าให้หน่อย". A generated page should open
+   with real races and a **Sources** list of `http(s)` links under it.
+   `npm run smoke:live` checks the same.
 
 The browser's own speech recognition (Thai) needs Chrome on `localhost` or
 HTTPS.

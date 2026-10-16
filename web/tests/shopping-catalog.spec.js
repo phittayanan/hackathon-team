@@ -3,11 +3,12 @@ import { home, say, expectHome } from './helpers.js';
 
 const product = { id: 'p1', title: '<script>alert(1)</script>', seller: 'Real merchant', amount: 99900, currency: 'THB', description: 'Wireless headphones', url: 'https://merchant.example/products/headphones', image: null };
 
-test('no shop button on the home; only Shopify discovery is offered and the removed web search API is unavailable', async ({ page, request }) => {
+test('no shop button on the home; only Shopify discovery is offered; web search without a key is unavailable', async ({ page, request }) => {
   await home(page);
   await expect(page.getByTestId('shopify-catalog')).toHaveCount(0);
   await expect(page.getByTestId('shopping-search')).toHaveCount(0);
-  expect((await request.post('/api/search', { data: { query: 'headphones' } })).status()).toBe(404);
+  expect((await request.post('/api/search', { data: { query: 'headphones' } })).status()).toBe(503);
+  expect((await (await request.get('/api/health')).json()).search).toBe(false);
 });
 
 test('spoken requirements show Shopify product cards and selection never orders or pays', async ({ page }) => {
