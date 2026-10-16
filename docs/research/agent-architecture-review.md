@@ -2,11 +2,11 @@
 
 **Result.** Sound design: one voice agent, 9 small tools, a page writer, an offline fallback. Weak spots: a blocked key is never skipped, one error message covers two faults, and nothing tests the agent's choices.
 
-**Meaning.** If a workspace is blocked again, judges silently get the weaker offline agent, even with good keys left.
+**Meaning.** If a workspace is blocked again, judges silently get the offline agent, though good keys remain.
 
 **Before 14:00 (each under 1 hour, low risk):**
 
-1. Remove the blocked key from `ELEVENLABS_API_KEYS` on Vercel; redeploy (R1).
+1. Remove the blocked key from `ELEVENLABS_API_KEYS`; redeploy (R1).
 2. Treat "restricted" like "out of credit", so the next key is used (R2).
 3. Split the `render_ui` error into bad JSON and bad blocks (T1, via the `agent-tools.js` session).
 
