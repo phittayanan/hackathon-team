@@ -121,8 +121,9 @@ Each line records one event with a millisecond time: what the user said,
 typed or tapped; what the agent replied; every tool call; every voice start
 and end, with its source; scenes opening and closing; live agent sessions
 starting and ending (`live_start`, `live_end`: a new session has no memory of
-the last conversation); layout checks that failed (`page_check`); feed
-events; limit and offline switches; errors.
+the last conversation); layout checks that failed (`page_check`); lessons
+(`lesson`: `asked` with the mistake signal, `noted` with the rule the agent
+wrote); feed events; limit and offline switches; errors.
 
 ```text
 npm run log:check                                   # the latest run
@@ -131,7 +132,10 @@ npm run log:check -- logs/run-2026-10-15T17-41-34-352Z.jsonl
 
 It reports reply speed and flags two voices at once, replies slower than
 3 s, a scene that opened before the agent spoke, a feed event pushed over
-speech, self-hearing and errors.
+speech, self-hearing and errors. It also lists the lessons the agent wrote
+after its own mistakes. Lessons stay on each phone (at most 5); a lesson
+that shows up in many runs is a mistake every user hits, so move it into
+`agent/prompt.md` or the code.
 
 ## Speed check
 
@@ -162,4 +166,4 @@ Other URL options:
 | --- | --- |
 | `?script=off` | Stops the scripted feed events (the agent no longer speaks first on its own) |
 | `?mute=1` | Silences the voice |
-| `?forget=1` | Forgets memory and learned preferences |
+| `?forget=1` | Forgets memory, learned preferences and lessons |

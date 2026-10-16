@@ -28,9 +28,10 @@ test('memory: keeps a few short facts, forgets on empty, and makes the {{memory}
     today: 'Friday 16 October 2026 (2026-10-16)',
     memory: 'name: Ploy; last task: 10K training plan and race sign-up',
     learned: 'nothing yet',
+    lessons: 'nothing yet',
   });
-  // No date from the server: memory and learned only.
-  assert.deepEqual(Object.keys(sessionVariables({})), ['memory', 'learned']);
+  // No date from the server: memory, learned and lessons only.
+  assert.deepEqual(Object.keys(sessionVariables({})), ['memory', 'learned', 'lessons']);
 });
 
 test('memory: blocked or broken storage is an empty memory, never an error', () => {

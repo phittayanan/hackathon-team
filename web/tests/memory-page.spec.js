@@ -8,23 +8,26 @@ const LEARNED = [
   { key: 'todo:due', text: 'todo pages: give checklist items due dates', n: 2, at: 2 },
   { key: 'todo:progress', text: 'todo pages: add a progress bar', n: 1, at: 1 },
 ];
+const LESSONS = [{ text: 'When asked to make a page prettier, change only its look and keep its content.', at: 3 }];
 const page1 = (kind, name) => ({ kind, name, match: [kind], spec: { kind, name, title: name, blocks: [{ type: 'text', text: 'hi' }] }, savedAt: '2026-10-15T09:00:00.000Z' });
 const SAVED = { todo: page1('todo', 'To-do list'), packing: page1('packing', 'Packing list') };
 
 async function seed(page) {
-  await page.addInitScript(([facts, lines, saved]) => {
+  await page.addInitScript(([facts, lines, saved, rules]) => {
     if (sessionStorage.getItem('seeded')) return;
     localStorage.setItem('agentos.memory', JSON.stringify(facts));
     localStorage.setItem('agentos.learned', JSON.stringify(lines));
+    localStorage.setItem('agentos.lessons', JSON.stringify(rules));
     localStorage.setItem('agentos.savedScenes', JSON.stringify(saved));
     sessionStorage.setItem('seeded', '1');
-  }, [FACTS, LEARNED, SAVED]);
+  }, [FACTS, LEARNED, SAVED, LESSONS]);
 }
 
 const stored = (page) => page.evaluate(() => ({
   memory: JSON.parse(localStorage.getItem('agentos.memory') || '{}'),
   learned: JSON.parse(localStorage.getItem('agentos.learned') || '[]').map((l) => l.key),
   saved: Object.keys(JSON.parse(localStorage.getItem('agentos.savedScenes') || '{}')),
+  lessons: JSON.parse(localStorage.getItem('agentos.lessons') || '[]').length,
 }));
 
 // No button on the home screen: the user asks the agent for it.
@@ -44,6 +47,7 @@ test('memory page: edit a fact, forget a learned line, remove a kept page, then 
   await expect(facts.locator('.mem-row')).toHaveCount(3);
   await expect(facts).toContainText('Ploy');
   await expect(scene.getByTestId('mem-learned').locator('.mem-row')).toHaveCount(2);
+  await expect(scene.getByTestId('mem-lessons')).toContainText('change only its look');
   await expect(scene.getByTestId('mem-kept').locator('.mem-row')).toHaveCount(2);
   await expect(scene.getByTestId('mem-kept')).toContainText('Packing list');
 
@@ -57,6 +61,11 @@ test('memory page: edit a fact, forget a learned line, remove a kept page, then 
   await expect(scene.getByTestId('edit-likes')).toHaveCount(0);
   await expect(facts.locator('[data-key=likes] .mem-value')).toHaveText('swimming and coffee');
   expect((await stored(page)).memory).toEqual({ ...FACTS, likes: 'swimming and coffee' });
+
+  // Forget the lesson.
+  await scene.getByTestId('forget-lesson-0').click();
+  await expect(scene.getByTestId('mem-lessons').locator('.mem-empty')).toHaveText('ยังไม่มี');
+  expect((await stored(page)).lessons).toBe(0);
 
   // Forget one fact.
   await scene.getByTestId('forget-last_task').click();
@@ -83,9 +92,9 @@ test('memory page: edit a fact, forget a learned line, remove a kept page, then 
   expect((await stored(page)).saved).toEqual(['todo']);
   await scene.getByTestId('forget-all').click();
   await scene.getByTestId('forget-all-yes').click();
-  for (const id of ['mem-facts', 'mem-learned', 'mem-kept']) await expect(scene.getByTestId(id).locator('.mem-empty')).toHaveText('ยังไม่มี');
+  for (const id of ['mem-facts', 'mem-learned', 'mem-lessons', 'mem-kept']) await expect(scene.getByTestId(id).locator('.mem-empty')).toHaveText('ยังไม่มี');
   await expect(scene.getByTestId('forget-all')).toHaveCount(0);
-  expect(await stored(page)).toEqual({ memory: {}, learned: [], saved: [] });
+  expect(await stored(page)).toEqual({ memory: {}, learned: [], saved: [], lessons: 0 });
 
   // Closing folds back home like other scenes.
   await page.getByTestId('home-btn').click();

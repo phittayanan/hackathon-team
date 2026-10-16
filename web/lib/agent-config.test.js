@@ -87,6 +87,12 @@ test('the prompt takes {{memory}} with a placeholder, and teaches remember, plan
   assert.match(prompt, /\{\{learned\}\}/);
   assert.equal(agent.dynamic_variables.dynamic_variable_placeholders.learned, 'nothing yet');
   assert.match(prompt, /When you apply something you learned, say so/);
+  // Its lessons from its own mistakes come back as {{lessons}}; a [lesson] note asks for note_lesson.
+  assert.match(prompt, /\{\{lessons\}\}/);
+  assert.equal(agent.dynamic_variables.dynamic_variable_placeholders.lessons, 'nothing yet');
+  assert.match(prompt, /`\[lesson\]`[\s\S]*call `note_lesson` once, without saying anything/);
+  // note_lesson is quiet, like remember: no forced sentence first.
+  assert.equal(toolConfigs().find((t) => t.name === 'note_lesson').pre_tool_speech, undefined);
   for (const name of ['open_scene', 'render_ui']) {
     const plan = tools.find((t) => t.name === name).parameters;
     assert.ok(plan.properties.plan && !plan.required.includes('plan'), name);

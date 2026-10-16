@@ -12,20 +12,53 @@ beforeEach(() => {
 
 const todo = (blocks, extra = {}) => ({ kind: 'todo', name: 'To-do list', accent: 'orange', blocks, ...extra });
 
-test('a revise teaches what changed: blocks added or left out, due dates, colour', () => {
+test('a revise teaches what the user asked to change: blocks added or left out, due dates, colour', () => {
   const before = todo([{ type: 'checklist', items: [{ text: 'Run' }] }, { type: 'text', text: 'hi' }]);
   const after = todo([{ type: 'checklist', items: [{ text: 'Run', due: 'Mon' }] }, { type: 'progress', value: 'auto' }], { accent: 'green' });
-  assert.deepEqual(reviseLessons(before, after).map((l) => l.text), [
+  assert.deepEqual(reviseLessons(before, after, 'add a progress bar, drop the note, give each a due date, make it green').map((l) => l.text), [
     'todo pages: add a progress bar',
     'todo pages: leave out a note',
     'todo pages: give checklist items due dates',
     'todo pages: green colour',
   ]);
-  assert.deepEqual(reviseLessons(before, before), []);
+  assert.deepEqual(reviseLessons(before, after, 'เพิ่มหลอดความคืบหน้า ใส่วันที่ครบกำหนด สีเขียว').map((l) => l.text), [
+    'todo pages: add a progress bar',
+    'todo pages: give checklist items due dates',
+    'todo pages: green colour',
+  ]);
+  assert.deepEqual(reviseLessons(before, before, 'add a progress bar'), []);
+  // No words heard (or older than a minute): nothing the user asked for, nothing learned.
+  assert.deepEqual(reviseLessons(before, after), []);
   // Some items had a due date; after the revise every item has one.
   const some = todo([{ type: 'checklist', items: [{ text: 'Run', due: 'Mon' }, { text: 'Swim' }] }]);
   const every = todo([{ type: 'checklist', items: [{ text: 'Run', due: 'Mon' }, { text: 'Swim', due: 'Tue' }] }]);
-  assert.deepEqual(reviseLessons(some, every).map((l) => l.text), ['todo pages: give checklist items due dates']);
+  assert.deepEqual(reviseLessons(some, every, 'due dates for all').map((l) => l.text), ['todo pages: give checklist items due dates']);
+});
+
+// Run log, session 50es27: the user only asked for a prettier page; the agent itself switched to
+// orange and added numbers and a progress bar. None of that is the user's preference.
+test('"make it prettier" teaches nothing: the agent\'s own changes are not the user\'s wishes', () => {
+  const before = todo([{ type: 'checklist', items: [{ text: 'Run' }, { text: 'Swim' }] }], { accent: 'blue' });
+  const after = todo([{ type: 'stat', label: 'Done', value: '0/2' }, { type: 'progress', value: 'auto' }, { type: 'checklist', items: [{ text: 'Run' }, { text: 'Swim' }] }], { accent: 'orange' });
+  assert.deepEqual(reviseLessons(before, after, 'สวยกว่านี้ได้ไหม'), []);
+  assert.deepEqual(reviseLessons(before, after, 'make it prettier'), []);
+  noteHeard('สวยกว่านี้ได้ไหม');
+  assert.deepEqual(noteRevise(before, after), []);
+  assert.equal(learnedText(), 'nothing yet');
+  // Only the change the words name: the colour, not the extras.
+  assert.deepEqual(reviseLessons(before, after, 'เปลี่ยนเป็นสีส้ม').map((l) => l.text), ['todo pages: orange colour']);
+  assert.deepEqual(reviseLessons(before, after, 'ขอตัวเลขสรุปด้วย').map((l) => l.text), ['todo pages: add numbers']);
+});
+
+test('words inside other words do not name a change', () => {
+  const before = todo([{ type: 'text', text: 'hi' }], { accent: 'blue' });
+  const after = todo([{ type: 'text', text: 'hi' }, { type: 'image', prompt: 'beach' }], { accent: 'orange' });
+  assert.deepEqual(reviseLessons(before, after, 'เปลี่ยนรูปแบบหน่อย'), []); // "format", not "picture"
+  assert.deepEqual(reviseLessons(before, after, 'อยากกินส้มตำ'), []); // som tam, not orange
+  assert.deepEqual(reviseLessons(before, after, 'ใส่รูปทะเล').map((l) => l.text), ['todo pages: add a picture']);
+  const list = todo([{ type: 'checklist', items: [{ text: 'a' }] }, { type: 'list', items: ['b'] }]);
+  assert.deepEqual(reviseLessons(before, list, 'add a checklist').map((l) => l.text), ['todo pages: add a checklist']); // not "a list"
+  assert.deepEqual(reviseLessons(before, list, 'add a check list').map((l) => l.text), ['todo pages: add a checklist']);
 });
 
 test('learned preferences are capped, deduplicated with a count, and become {{learned}}', () => {
@@ -76,6 +109,7 @@ test('tools: a revise and a keep feed the learner; forget_all clears it', async 
   const h = createToolHandlers(ui);
   const page = todo([{ type: 'checklist', items: [{ text: 'Run' }] }], { proposals: [{ id: 'w', label: 'Add weather' }] });
   await h.render_ui({ spec_json: JSON.stringify(page) });
+  noteHeard('give each task a due date');
   h.revise_ui({ spec_json: JSON.stringify(todo([{ type: 'checklist', items: [{ text: 'Run', due: 'Mon' }] }])) });
   h.keep_scene();
   assert.deepEqual(learned().map((l) => l.text), ['liked and kept the todo page layout', 'todo pages: give checklist items due dates']);
@@ -126,14 +160,16 @@ test('words that only look like style wishes change nothing', () => {
   assert.deepEqual(wish(''), []);
 });
 
-test('a chart removed by a revise sets charts: avoid; one added back sets ok', () => {
-  assert.deepEqual(styleChanges(chartPage(), plain, ''), [{ key: 'charts', value: 'avoid' }]);
-  assert.deepEqual(styleChanges(plain, chartPage(), '', { ...STYLE_DEFAULT, charts: 'avoid' }), [{ key: 'charts', value: 'ok' }]);
-  assert.deepEqual(styleChanges(chartPage(), chartPage(), ''), []);
+test('a chart the user asked to remove sets charts: avoid; one asked back sets ok; the agent\'s own does nothing', () => {
+  assert.deepEqual(styleChanges(chartPage(), plain, 'เอากราฟออก'), [{ key: 'charts', value: 'avoid' }]);
+  assert.deepEqual(styleChanges(plain, chartPage(), 'add a chart', { ...STYLE_DEFAULT, charts: 'avoid' }), [{ key: 'charts', value: 'ok' }]);
+  assert.deepEqual(styleChanges(chartPage(), chartPage(), 'เอากราฟออก'), []);
+  assert.deepEqual(styleChanges(chartPage(), plain, 'สวยกว่านี้ได้ไหม'), []);
+  assert.deepEqual(styleChanges(chartPage(), plain, ''), []);
 });
 
 test('noteStyle saves the profile and adds one learned line per change', () => {
-  noteStyle(chartPage(), plain, 'ใหญ่ขึ้น สีเขียวอมฟ้า');
+  noteStyle(chartPage(), plain, 'ใหญ่ขึ้น สีเขียวอมฟ้า ไม่เอากราฟ');
   assert.deepEqual(styleProfile(), { ...STYLE_DEFAULT, size: 'large', accent: 'teal', charts: 'avoid' });
   assert.match(learnedText(), /style: large text/);
   assert.match(learnedText(), /style: teal accent/);

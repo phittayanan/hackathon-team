@@ -2,6 +2,7 @@
 // The live agent gets them as {{memory}} at session start, saves new ones with the `remember`
 // tool, and the last task is saved by itself when a tool opens a page.
 import { learnedText } from './learn.js';
+import { lessonsText } from './lessons.js';
 
 const KEY = 'agentos.memory';
 export const MEMORY_KEYS = ['name', 'likes', 'last_task', 'note'];
@@ -51,9 +52,10 @@ export function memoryText(facts = recall()) {
 }
 
 // The dynamic variables sent at session start: today's date from the server, the memory, and
-// what the agent learned from how this user uses the app.
+// what the agent learned from how this user uses the app, and its lessons from its own mistakes.
 export const sessionVariables = (session = {}) => ({
   ...(session.today ? { today: session.today } : {}),
   memory: memoryText(),
   learned: learnedText(),
+  lessons: lessonsText(),
 });

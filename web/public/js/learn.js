@@ -4,6 +4,7 @@
 // The live agent gets them as {{learned}} at session start and builds the next page with them.
 // Capped (newest 6), each line short; `?forget=1` or the remember tool's forget_all resets.
 import { styleProfile, setStyle, resetStyle, STYLE_FIELDS, STYLE_WORDS } from './style.js';
+import { forgetLessons } from './lessons.js';
 
 const KEY = 'agentos.learned';
 export const MAX_LEARNED = 6;
@@ -71,19 +72,42 @@ const items = (spec) => (spec?.blocks || []).filter((b) => b.type === 'checklist
 // Every checklist item has the field (a revise "give each task a due date" makes it so).
 const uses = (spec, field) => items(spec).length > 0 && items(spec).every((i) => i[field]);
 
-// What a revise changed, as short preferences: [{ key, text }].
-export function reviseLessons(before, after) {
+// Words that name each change, Thai and English, so a revise saves only what the user asked for.
+// Thai words that sit inside common words are guarded ("รูปแบบ" is "format", not "a picture").
+const BLOCK_WORDS = {
+  text: /\bnotes?\b|\btext\b|ข้อความ|โน้ต/i,
+  stat: /numbers?|\bstats?\b|statistic|ตัวเลข|สถิติ/i,
+  progress: /progress|ความคืบหน้า|หลอด|แถบ/i,
+  checklist: /check ?list|checkbox|เช็[คก]ลิสต์|ติ๊ก/i,
+  list: /(?<!check ?)\blists?\b|รายการ/i,
+  card: /\bcards?\b|การ์ด/i,
+  chart: /chart|graph|กราฟ|แผนภูมิ/i,
+  field: /\bfields?\b|\binput|ช่องกรอก|ช่องใส่/i,
+  button: /button|ปุ่ม/i,
+  steps: /\bsteps?\b|ขั้นตอน/i,
+  image: /image|picture|photo|รูปภาพ|รูป(?!แบบ)/i,
+};
+const DUE_WORDS = /\bdue\b|deadline|\bdates?\b|กำหนดส่ง|ครบกำหนด|เดดไลน์|วันที่/i;
+const TAG_WORDS = /\btags?\b|\blabels?\b|แท็ก|ป้าย/i;
+
+// What a revise changed, as short preferences: [{ key, text }]. Only the changes the user's words
+// (wish) name: the agent's own extras ("make it prettier" -> an orange accent and a progress bar)
+// are not the user's preferences.
+export function reviseLessons(before, after, wish = '') {
   if (!before || !after) return [];
+  const said = String(wish || '');
+  if (!said.trim()) return [];
   const kind = kindOf(after);
   const name = pageName(after);
   const out = [];
   const was = types(before);
   const now = types(after);
-  for (const t of now) if (!was.has(t) && BLOCKS[t]) out.push({ key: `${kind}:+${t}`, text: `${name} pages: add ${BLOCKS[t]}` });
-  for (const t of was) if (!now.has(t) && BLOCKS[t]) out.push({ key: `${kind}:-${t}`, text: `${name} pages: leave out ${BLOCKS[t]}` });
-  if (!uses(before, 'due') && uses(after, 'due')) out.push({ key: `${kind}:due`, text: `${name} pages: give checklist items due dates` });
-  if (!uses(before, 'tag') && uses(after, 'tag')) out.push({ key: `${kind}:tag`, text: `${name} pages: tag checklist items` });
-  if (after.accent && before.accent !== after.accent) out.push({ key: `${kind}:accent`, text: `${name} pages: ${after.accent} colour` });
+  const named = (t) => BLOCKS[t] && BLOCK_WORDS[t]?.test(said);
+  for (const t of now) if (!was.has(t) && named(t)) out.push({ key: `${kind}:+${t}`, text: `${name} pages: add ${BLOCKS[t]}` });
+  for (const t of was) if (!now.has(t) && named(t)) out.push({ key: `${kind}:-${t}`, text: `${name} pages: leave out ${BLOCKS[t]}` });
+  if (!uses(before, 'due') && uses(after, 'due') && DUE_WORDS.test(said)) out.push({ key: `${kind}:due`, text: `${name} pages: give checklist items due dates` });
+  if (!uses(before, 'tag') && uses(after, 'tag') && TAG_WORDS.test(said)) out.push({ key: `${kind}:tag`, text: `${name} pages: tag checklist items` });
+  if (after.accent && before.accent !== after.accent && SPEC_ACCENT_WORDS[after.accent]?.test(said)) out.push({ key: `${kind}:accent`, text: `${name} pages: ${after.accent} colour` });
   return out;
 }
 
@@ -112,6 +136,17 @@ const ACCENT_WORDS = [
   ['blue', /blue|น้ำเงิน|สีฟ้า/i],
   ['green', /green|เขียว/i],
 ];
+// The page accents (genui.js) and the words that name them: the style accents above where they
+// match, plus orange and dark. "สีส้ม", not a bare "ส้ม" (som tam).
+const accentWords = (style) => ACCENT_WORDS.find(([k]) => k === style)[1];
+const SPEC_ACCENT_WORDS = {
+  orange: /orange|สีส้ม/i,
+  green: accentWords('green'),
+  blue: accentWords('blue'),
+  purple: accentWords('lavender'),
+  pink: accentWords('rose'),
+  dark: /\bdark\b|black|สีดำ|สีเข้ม|โทนมืด/i,
+};
 
 const step = (key, value, by) => {
   const values = STYLE_FIELDS[key].values;
@@ -129,7 +164,8 @@ export function styleChanges(before, after, wish = '', profile = styleProfile())
   const accent = ACCENT_WORDS.find(([, re]) => re.test(text));
   if (accent) next.accent = accent[0];
   if (CONTRAST_WORDS.test(text)) next.contrast = 'high';
-  if (before && after) {
+  // Charts only when the user's words name them, as for reviseLessons.
+  if (before && after && BLOCK_WORDS.chart.test(text)) {
     if (types(before).has('chart') && !types(after).has('chart')) next.charts = 'avoid';
     else if (!types(before).has('chart') && types(after).has('chart')) next.charts = 'ok';
   }
@@ -145,7 +181,7 @@ export function noteStyle(before, after, wish = heardWish()) {
 }
 
 export function noteRevise(before, after, wish = heardWish()) {
-  return [...reviseLessons(before, after).map(({ key, text }) => learn(key, text)), ...noteStyle(before, after, wish)];
+  return [...reviseLessons(before, after, wish).map(({ key, text }) => learn(key, text)), ...noteStyle(before, after, wish)];
 }
 
 export const noteKeep = (spec) => learn(`${kindOf(spec)}:kept`, `liked and kept the ${pageName(spec)} page layout`);
@@ -192,6 +228,7 @@ export const proactiveWatch = {
 export function forgetOnRequest(search = globalThis.location?.search || '') {
   if (!new URLSearchParams(search).has('forget')) return false;
   forgetLearned();
+  forgetLessons();
   resetStyle();
   try {
     globalThis.localStorage?.removeItem('agentos.memory');

@@ -1,11 +1,12 @@
 // Memory page: what the agent remembers on this phone, and the user's say over it.
-// Four groups: facts (memory.js), what it learned from use (learn.js), kept pages (generated.js) and
-// the user's own design system (style.js), with a live preview and choice buttons per field.
+// Five groups: facts (memory.js), what it learned from use (learn.js), its lessons from its own
+// mistakes (lessons.js), kept pages (generated.js) and the user's own design system (style.js), with a live preview and choice buttons per field.
 // Each line can be forgotten, a fact can be edited, and "Forget everything" clears all of it after
 // one confirm step on the page. With the live agent connected, every change is sent as context,
 // so the agent does not repeat a forgotten fact in this session.
 import { recall, remember, forgetMemory, MEMORY_KEYS } from '../memory.js';
 import { learned, forgetLearnedKey, forgetLearned } from '../learn.js';
+import { lessons, forgetLesson, forgetLessons } from '../lessons.js';
 import { loadSaved, removeSaved } from './generated.js';
 import { live, sendContext } from '../live-agent.js';
 import { styleProfile, setStyle, resetStyle, isDefaultStyle, applyStyle, ACCENTS, STYLE_FIELDS, STYLE_WORDS } from '../style.js';
@@ -105,6 +106,15 @@ export default function mountMemory(el) {
     return row;
   };
 
+  const lessonRow = (lesson, i) => {
+    const row = h('li', 'mem-row');
+    row.dataset.key = String(i);
+    const actions = h('div', 'mem-actions');
+    actions.append(button('ลืม · Forget', () => { forgetLesson(lesson.text); tell(`forgot the lesson "${lesson.text}"`); draw(); }, `forget-lesson-${i}`));
+    row.append(h('span', 'mem-value', lesson.text), actions);
+    return row;
+  };
+
   const keptRow = (page) => {
     const row = h('li', 'mem-row');
     row.dataset.key = page.kind;
@@ -182,17 +192,19 @@ export default function mountMemory(el) {
   const forgetAll = () => {
     forgetMemory();
     forgetLearned();
+    forgetLessons();
     resetStyle();
     for (const page of kept()) removeSaved(page.kind);
     confirming = false;
     editing = null;
-    tell('forgot everything (all facts, all learned preferences, all kept pages, and the style is back to the Q-Bot default)');
+    tell('forgot everything (all facts, all learned preferences, all lessons, all kept pages, and the style is back to the Q-Bot default)');
     draw();
   };
 
   const draw = () => {
     const facts = recall();
     const lines = learned();
+    const rules = lessons();
     const pages = kept();
     el.replaceChildren();
     const head = h('header', 'mem-head');
@@ -201,11 +213,12 @@ export default function mountMemory(el) {
     el.append(head,
       group('สิ่งที่รู้เกี่ยวกับคุณ', 'What I know about you', 'mem-facts', MEMORY_KEYS.filter((k) => facts[k]).map((k) => factRow(k, facts[k]))),
       group('สิ่งที่เรียนรู้จากการใช้งาน', 'What I learned from how you use the app', 'mem-learned', lines.map(learnedRow)),
+      group('บทเรียนจากที่ฉันพลาด', 'Lessons from my own mistakes', 'mem-lessons', rules.map(lessonRow)),
       group('หน้าที่คุณเก็บไว้', 'Pages you kept', 'mem-kept', pages.map(keptRow)),
       styleGroup());
 
     const foot = h('div', 'mem-foot');
-    const anything = Object.keys(facts).length || lines.length || pages.length || !isDefaultStyle();
+    const anything = Object.keys(facts).length || lines.length || rules.length || pages.length || !isDefaultStyle();
     if (confirming) {
       const ask = h('div', 'mem-confirm');
       ask.dataset.testid = 'forget-all-confirm';

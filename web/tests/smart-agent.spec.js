@@ -46,7 +46,7 @@ test('memory: a first visit sends "nothing yet"; remember and a finished task ar
   await stubLive(page);
   await connect(page);
   const vars = await page.evaluate(() => window.__conv.opts.dynamicVariables);
-  expect(vars).toEqual({ today: 'Friday 16 October 2026 (2026-10-16)', memory: 'nothing yet (first visit)', learned: 'nothing yet' });
+  expect(vars).toEqual({ today: 'Friday 16 October 2026 (2026-10-16)', memory: 'nothing yet (first visit)', learned: 'nothing yet', lessons: 'nothing yet' });
 
   expect(await tool(page, 'remember', { key: 'name', value: 'Ploy' })).toMatch(/^remembered name/);
   expect(await tool(page, 'remember', { key: 'likes', value: 'running' })).toMatch(/^remembered likes/);
@@ -122,6 +122,8 @@ test('learning: a revise in one visit reaches the next session as {{learned}}; ?
   await connect(page);
   const page1 = { kind: 'todo', name: 'To-do list', title: 'To-do', blocks: [{ type: 'checklist', items: [{ text: 'Run' }] }], proposals: [{ id: 'd', label: 'Add due dates' }] };
   await tool(page, 'render_ui', { spec_json: JSON.stringify(page1) });
+  // The user's words name both changes: only changes the user asked for are learned.
+  await page.evaluate(() => window.__conv.opts.onMessage({ source: 'user', message: 'add due dates and a progress bar' }));
   await tool(page, 'revise_ui', { spec_json: JSON.stringify({ ...page1, blocks: [{ type: 'checklist', items: [{ text: 'Run', due: 'Mon' }] }, { type: 'progress', label: 'Done', value: 'auto' }] }) });
   await tool(page, 'scene_action', { action: 'close' });
   await expectHome(page);
