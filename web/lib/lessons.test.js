@@ -61,6 +61,16 @@ test('the agent saying it cannot see what the user means, and other signals', ()
   assert.equal(isLayoutFailure('[screen] The designed page (v1) looks like: ...'), false);
 });
 
+test('reassurance after a page is shown does not ask for a mistake lesson', () => {
+  const w = createLessonWatch({ now: () => 100000 });
+  w.pageShown();
+  for (const text of ['No problem, thank you', 'No worries', 'NO PROBLEM!', 'No problems, thanks']) {
+    assert.equal(isRejection(text), false, text);
+    assert.equal(w.user(text), null, text);
+  }
+  assert.equal(w.user('No problem, but this is wrong').kind, 'user rejected');
+});
+
 test('the watch asks once per mistake: tool error, layout check, rejection right after a page, blind reply', () => {
   let t = 0;
   const w = createLessonWatch({ now: () => t });

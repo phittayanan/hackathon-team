@@ -134,6 +134,64 @@ const chartPage = (extra = []) => todo([{ type: 'chart', bars: [{ label: 'a', va
 const plain = todo([{ type: 'text', text: 'hi' }]);
 const wish = (text, profile = STYLE_DEFAULT) => styleChanges(plain, plain, text, profile);
 
+test('block lessons and chart profile require explicit direction matching the diff', () => {
+  for (const [direction, wishes] of [
+    ['+', ['add a chart', 'include the graph', 'เพิ่มกราฟ', 'ใส่แผนภูมิ']],
+    ['-', ['remove the chart', 'drop the graph', 'เอากราฟออก', 'ลบแผนภูมิ', 'ไม่เอากราฟ']],
+  ]) {
+    const [before, after] = direction === '+' ? [todo([]), chartPage()] : [chartPage(), todo([])];
+    const profile = { ...STYLE_DEFAULT, charts: direction === '+' ? 'avoid' : 'ok' };
+    for (const text of wishes) {
+      assert.deepEqual(reviseLessons(before, after, text).map((l) => l.key), [`todo:${direction}chart`], text);
+      assert.deepEqual(styleChanges(before, after, text, profile), [{ key: 'charts', value: direction === '+' ? 'ok' : 'avoid' }], text);
+      assert.deepEqual(reviseLessons(after, before, text), [], `opposite diff: ${text}`);
+      assert.deepEqual(styleChanges(after, before, text, profile), [], `opposite diff: ${text}`);
+    }
+  }
+  for (const text of [
+    'make chart prettier', 'make the chart green', 'เปลี่ยนสีกราฟ', 'ขอกราฟสวยขึ้นด้วย',
+    'keep the chart', 'เก็บกราฟไว้', "don't remove the chart", 'do not add a chart',
+    'never drop the chart', 'อย่าเอากราฟออก', 'ไม่ต้องเพิ่มกราฟ', 'ไม่ลบกราฟ', 'ไม่เอากราฟออก',
+    'add a chart, remove the chart', 'add color to the chart', 'เพิ่มขนาดกราฟ',
+    'remove the chart border', "remove the chart's title", 'remove the chart’s legend',
+  ]) {
+    for (const [before, after] of [[todo([]), chartPage()], [chartPage(), todo([])]]) {
+      assert.deepEqual(reviseLessons(before, after, text).filter((l) => /[+-]chart$/.test(l.key)), [], text);
+      for (const charts of ['ok', 'avoid']) {
+        assert.deepEqual(styleChanges(before, after, text, { ...STYLE_DEFAULT, charts }).filter((l) => l.key === 'charts'), [], text);
+      }
+    }
+  }
+});
+
+test('directions stay with their component across clauses', () => {
+  const before = chartPage();
+  const after = todo([{ type: 'progress', value: 'auto' }]);
+  for (const text of ['remove the chart and add a progress bar', 'เอากราฟออก แล้วเพิ่มหลอดความคืบหน้า']) {
+    assert.deepEqual(reviseLessons(before, after, text).map((l) => l.key), ['todo:+progress', 'todo:-chart'], text);
+  }
+  for (const text of ["don't remove the chart, add a progress bar", 'เก็บกราฟไว้ แต่เพิ่มหลอดความคืบหน้า']) {
+    assert.deepEqual(reviseLessons(before, after, text).map((l) => l.key), ['todo:+progress'], text);
+    assert.deepEqual(styleChanges(before, after, text), [], text);
+  }
+  assert.deepEqual(reviseLessons(before, after, 'remove the note, make the chart prettier'), []);
+  assert.deepEqual(reviseLessons(todo([]), after, 'add due dates and a progress bar').map((l) => l.key), ['todo:+progress']);
+  assert.deepEqual(reviseLessons(todo([]), after, "don't add due dates and a progress bar"), []);
+  for (const text of ['remove the note but add due dates and a chart', 'remove the note then add due dates and a chart', 'remove the note and add due dates and a chart']) {
+    assert.deepEqual(reviseLessons(chartPage(), todo([]), text), [], text);
+    assert.deepEqual(styleChanges(chartPage(), todo([]), text), [], text);
+    assert.deepEqual(reviseLessons(todo([]), chartPage(), text).map((l) => l.key), ['todo:+chart'], text);
+  }
+});
+
+test('keeping a chart while changing colour cannot teach chart avoidance', () => {
+  noteHeard('เก็บกราฟไว้ เปลี่ยนเป็นสีเขียว');
+  noteRevise(chartPage(), todo([], { accent: 'green' }));
+  assert.equal(styleProfile().charts, 'ok');
+  assert.equal(styleProfile().accent, 'green');
+  assert.deepEqual(learned().map((l) => l.key).sort(), ['style:accent', 'todo:accent']);
+});
+
 test('revise wishes become style changes, in Thai and English', () => {
   assert.deepEqual(wish('ขอตัวหนังสือใหญ่ขึ้น'), [{ key: 'size', value: 'large' }]);
   assert.deepEqual(wish('make the text bigger', { ...STYLE_DEFAULT, size: 'large' }), [{ key: 'size', value: 'xlarge' }]);

@@ -81,7 +81,7 @@ const BLOCK_WORDS = {
   checklist: /check ?list|checkbox|เช็[คก]ลิสต์|ติ๊ก/i,
   list: /(?<!check ?)\blists?\b|รายการ/i,
   card: /\bcards?\b|การ์ด/i,
-  chart: /chart|graph|กราฟ|แผนภูมิ/i,
+  chart: /\bcharts?\b|\bgraphs?\b|กราฟ|แผนภูมิ/i,
   field: /\bfields?\b|\binput|ช่องกรอก|ช่องใส่/i,
   button: /button|ปุ่ม/i,
   steps: /\bsteps?\b|ขั้นตอน/i,
@@ -89,6 +89,29 @@ const BLOCK_WORDS = {
 };
 const DUE_WORDS = /\bdue\b|deadline|\bdates?\b|กำหนดส่ง|ครบกำหนด|เดดไลน์|วันที่/i;
 const TAG_WORDS = /\btags?\b|\blabels?\b|แท็ก|ป้าย/i;
+
+// shortcut: only direct commands in simple clauses; skip ambiguous wording until richer intent is needed.
+function blockDirection(wish, type) {
+  if (!BLOCKS[type]) return '';
+  const noun = `(?:${BLOCK_WORDS[type].source})`;
+  const object = `(?:(?:a|an|the|some)\\s+)?${noun}(?!['’]s\\b|\\s+(?:colou?r|style|title|size|border|background|shadow|legend|labels?|axes|axis)\\b)`;
+  const add = new RegExp(`\\b(?:add|include|insert|show)\\s+${object}|(?:เพิ่ม|ใส่)\\s*${noun}|ขอ\\s*${noun}(?:สรุป)?ด้วย`, 'i');
+  const remove = new RegExp(`\\b(?:remove|drop|delete|omit)\\s+${object}|\\btake\\s+${object}\\s+out\\b|(?:ลบ|ตัด|ไม่เอา)\\s*${noun}|เอา\\s*${noun}\\s*ออก`, 'i');
+  // Expand a shared verb only for positive commands: "add due dates and a progress bar".
+  if (!/\b(?:not|never|no|keep|retain|don't|don’t|cannot|can't|can’t)\b|อย่า|ห้าม|เก็บ|ไม่/i.test(wish)) {
+    wish = wish.split(/[,;.!?\n]|\b(?:but|then)\b|\band\s+(?=(?:add|include|insert|show|remove|drop|delete|omit)\b)/i)
+      .map((clause) => clause.replace(/\b(add|include|insert|show|remove|drop|delete|omit)\s+([^,;.!?\n]+?)\s+and\s+(?=(?:a|an|the|some)\s)/gi, '$1 $2, $1 ')).join(',');
+  }
+  const directions = new Set();
+  for (const clause of wish.split(/[,;.!?\n]|\b(?:and|but|then)\b|และ|แต่|แล้ว/i)) {
+    if (!BLOCK_WORDS[type].test(clause)) continue;
+    // A negated command or a request to keep this component is not an add/remove preference.
+    if (/\b(?:not|never|no|keep|retain)\b|\b(?:don't|don’t|cannot|can't|can’t)\b|อย่า|ห้าม|เก็บ|คงไว้|ไม่(?!เอา)|ไม่เอา.*ออก/i.test(clause)) return '';
+    if (add.test(clause)) directions.add('+');
+    if (remove.test(clause)) directions.add('-');
+  }
+  return directions.size === 1 ? [...directions][0] : '';
+}
 
 // What a revise changed, as short preferences: [{ key, text }]. Only the changes the user's words
 // (wish) name: the agent's own extras ("make it prettier" -> an orange accent and a progress bar)
@@ -102,9 +125,8 @@ export function reviseLessons(before, after, wish = '') {
   const out = [];
   const was = types(before);
   const now = types(after);
-  const named = (t) => BLOCKS[t] && BLOCK_WORDS[t]?.test(said);
-  for (const t of now) if (!was.has(t) && named(t)) out.push({ key: `${kind}:+${t}`, text: `${name} pages: add ${BLOCKS[t]}` });
-  for (const t of was) if (!now.has(t) && named(t)) out.push({ key: `${kind}:-${t}`, text: `${name} pages: leave out ${BLOCKS[t]}` });
+  for (const t of now) if (!was.has(t) && blockDirection(said, t) === '+') out.push({ key: `${kind}:+${t}`, text: `${name} pages: add ${BLOCKS[t]}` });
+  for (const t of was) if (!now.has(t) && blockDirection(said, t) === '-') out.push({ key: `${kind}:-${t}`, text: `${name} pages: leave out ${BLOCKS[t]}` });
   if (!uses(before, 'due') && uses(after, 'due') && DUE_WORDS.test(said)) out.push({ key: `${kind}:due`, text: `${name} pages: give checklist items due dates` });
   if (!uses(before, 'tag') && uses(after, 'tag') && TAG_WORDS.test(said)) out.push({ key: `${kind}:tag`, text: `${name} pages: tag checklist items` });
   if (after.accent && before.accent !== after.accent && SPEC_ACCENT_WORDS[after.accent]?.test(said)) out.push({ key: `${kind}:accent`, text: `${name} pages: ${after.accent} colour` });
@@ -164,10 +186,11 @@ export function styleChanges(before, after, wish = '', profile = styleProfile())
   const accent = ACCENT_WORDS.find(([, re]) => re.test(text));
   if (accent) next.accent = accent[0];
   if (CONTRAST_WORDS.test(text)) next.contrast = 'high';
-  // Charts only when the user's words name them, as for reviseLessons.
-  if (before && after && BLOCK_WORDS.chart.test(text)) {
-    if (types(before).has('chart') && !types(after).has('chart')) next.charts = 'avoid';
-    else if (!types(before).has('chart') && types(after).has('chart')) next.charts = 'ok';
+  // Share the block lesson's direction check so the profile cannot learn the opposite wish.
+  if (before && after) {
+    const direction = blockDirection(text, 'chart');
+    if (types(before).has('chart') && !types(after).has('chart') && direction === '-') next.charts = 'avoid';
+    else if (!types(before).has('chart') && types(after).has('chart') && direction === '+') next.charts = 'ok';
   }
   return Object.keys(STYLE_FIELDS).filter((k) => next[k] !== profile[k]).map((k) => ({ key: k, value: next[k] }));
 }
