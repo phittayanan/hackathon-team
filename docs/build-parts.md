@@ -1,13 +1,11 @@
 # Build parts
 
-The Agent OS demo, part by part. Parts 1 to 7 are done in
-[pull request #18](https://github.com/phittayanan/hackathon-team/pull/18)
-(issue #17). The list after them is work a teammate can pick up. Copy one
-into a new GitHub issue with the
+What is built, part by part, and where it lives. Paths are under `web/`.
+To add work, open a GitHub issue with the
 [Task template](../.github/ISSUE_TEMPLATE/task.md).
 
 The CryptoMate build parts were dropped on 2026-10-15. They are in the git
-history of this file.
+history of this file and in [archive/cryptomate/](archive/cryptomate/README.md).
 
 Folders and owners: [AGENTS.md](../AGENTS.md#folders-and-owners).
 Hard rules for every part: [Money safety](../AGENTS.md#money-safety).
@@ -15,77 +13,53 @@ How to run and test: [README.md](../README.md).
 
 ## Done
 
-| # | Part | Where | Status |
+Checked against `main` at `3b92022` (2026-10-16).
+
+| # | Part | Main files | Pull requests |
 | --- | --- | --- | --- |
-| 1 | Agent home, scene system, payment card | `web/public/js/app.js`, `scenes/payment.js`, `web/lib/router.js` | Done |
-| 2 | Shopping list from email, voice | `scenes/shopping.js`, `web/public/js/voice.js`, `web/scripts/render-voice.js` | Done |
-| 3 | Flight delay card | `scenes/flight.js` | Done |
-| 4 | Training page, race sign-up, docs | `scenes/training.js`, `docs/agent-os-storyboard.md` | Done |
-| 5 | Generated pages, like-and-adjust, keep liked pages | `web/lib/genui.js`, `scenes/generated.js` | Done |
-| 6 | Always-on agent | `web/lib/agent-loop.js`, `web/lib/feeds.js`, `web/lib/brain.js`, `web/public/js/agent-link.js` | Done |
-| 7 | Repo docs up to date | `README.md`, `docs/` | Done |
-| 8 | Ready for Vercel | `web/api/`, `web/lib/handlers.js`, `web/vercel.json` | Done, deploy pending |
+| 1 | Agent home, scene system, payment card | `public/js/app.js`, `public/js/scenes/payment.js`, `public/js/pay-rules.js`, `lib/router.js` | #18 |
+| 2 | Shopping list from email, voice lines | `public/js/scenes/shopping.js`, `public/js/voice.js`, `scripts/render-voice.js` | #18 |
+| 3 | Flight delay card | `public/js/scenes/flight.js` | #18 |
+| 4 | Training page, race sign-up (waits for the user's yes) | `public/js/scenes/training.js` | #18, #54 |
+| 5 | Generated pages: block pages, like-and-adjust, keep liked pages | `public/js/genui.js`, `public/js/scenes/generated.js` | #18, #43, #45 |
+| 6 | Always-on agent | `public/js/agent-loop.js`, `public/js/feeds.js`, `public/js/brain.js`, `public/js/agent-link.js` | #18 |
+| 7 | Vercel deploy | `api/`, `lib/handlers.js`, `lib/vercel.js`, `vercel.json` | #18, #34 |
+| 8 | Judge-ready: no passcode, daily limit, suggestions, offline notice | `lib/usage.js`, `public/js/suggest.js` | #20, #21, #24 |
+| 9 | Speed: faster live start and boot | `public/js/live-agent.js`, `scripts/measure.js` | #25 |
+| 10 | Smarter live agent: today's date, memory, learned preferences, plan line, fact sheet | `agent/`, `public/js/memory.js`, `public/js/learn.js`, `public/js/plan.js` | #23, #27, #28 |
+| 11 | Secretary demo: today, email to tasks, notifications | `public/js/secretary.js`, `public/js/scenes/secretary.js` ([notes](../web/SECRETARY-DEMO.md)) | #30 |
+| 12 | Credit saver: session limits, pictures made ahead of time, key rotation, blocked workspace skipped | `lib/accounts.js`, `lib/images.js`, `public/js/session-limits.js` | #31, #52 |
+| 13 | Generated pages as free HTML from the page writer, sanitized; page check and look | `lib/page-model.js`, `public/js/page-sanitize.js`, `public/js/page-check.js`, `public/js/page-look.js` | #33, #46, #50 |
+| 14 | Memory page: see, edit, forget | `public/js/scenes/memory.js` | #36 |
+| 15 | Q-Bot glass UI and mascot states | `public/css/app.css`, `public/js/mascot.js`, [design system](qbot-design-system.md) | #37 |
+| 16 | Shopify product discovery (replaced Tavily web search) | `lib/shopify-catalog.js`, `public/js/scenes/shopping-catalog.js` ([notes](../web/SHOPIFY-CATALOG.md)) | #38 |
+| 17 | Personal design system: each user's pages learn their style | `public/js/style.js` | #39 |
+| 18 | The agent sees the open scene and its facts | `public/js/scene-summary.js` | #48 |
+| 19 | YouTube tutorial search | `public/js/youtube-search.js`, `public/js/scenes/video-search.js` | #47 |
+| 20 | Nearby places through Google Maps | `lib/places.js`, `public/js/scenes/places.js` ([notes](../web/PLACES.md)) | #53 |
 
-### Part 1: Agent home, scene system, payment card
+## Open pull requests
 
-A mascot, voice waveform, one fading subtitle line and a hold-to-talk mic.
-Scenes grow out of the home and fold back. The brain picks a scene: the live
-ElevenLabs agent through client tools, or keywords offline. The payment card checks the rules in code and
-pays only on a tap of Allow.
+Checked 2026-10-16. The live list is on GitHub.
 
-### Part 2: Shopping list and voice
-
-The shopping list builds item by item from a fake email, then slides up into
-the payment card. Every fixed line is saved as an MP3 with ElevenLabs
-(`npm run voice`). Voice order: saved MP3, live ElevenLabs, browser voice.
-
-### Part 3: Flight delay card
-
-The agent offers a faster flight. "Yes" or the Yes button books it and the
-timeline changes. "No" keeps the old flight.
-
-### Part 4: Training page and race sign-up
-
-Sleep score, run plan, race card. The race card turns into a form that fills
-itself and submits, inside our own UI. Then the mascot runs on a treadmill.
-
-### Part 5: Generated pages
-
-When no prebuilt scene fits, the agent returns a page as JSON from a fixed set of
-parts: text, stat, progress, checklist, list, card, chart, field, button,
-divider. The browser draws it; it never runs model-written HTML or JS. The
-agent asks if you like it and proposes changes. Your answer changes the page
-in place. If you like it, the agent offers to keep it; a kept page opens at
-once next time, without a new generation. Without a key, "todo list" gets one
-ready-made page.
-
-### Part 6: Always-on agent
-
-A loop in the page watches fake feeds (email, calendar, sleep and runs,
-flight) every few seconds. It decides by itself when to speak and which scene
-to open. It never speaks over an open
-scene or while anyone talks. A script fires the feed events in a fixed order;
-the presenter can fire one from a panel (only with `?presenter=1`).
-
-### Part 8: Ready for Vercel
-
-The server routes are Vercel functions in `web/api/`, sharing code with the
-local server (`web/lib/handlers.js`). The always-on loop runs in the page, so
-no long-running server is needed. A daily usage limit protects the ElevenLabs
-and Tavily credit on the deployed site. The deploy steps are in the README.
-
-### Part 7: Docs
-
-README, idea, build parts, decisions and the storyboard describe Agent OS.
+| Pull request | What it adds |
+| --- | --- |
+| #51 | Video search lists YouTube clips and plays them in the app, with a Shorts mode |
+| #41 | Assistant replies grounded in secretary and catalog data, with behavior evals |
+| #26 | Generated pages: better layout, hierarchy and usability |
 
 ## Pick up next
 
+The demo plan and the demo video are being replanned. Until then, these are
+left from the earlier list:
+
 | Part | Why | Size |
 | --- | --- | --- |
-| Smoke-test the live ElevenLabs agent | Needs a key with the Agents permission; then `npm run agent:sync` and the README smoke step | 1 h |
 | Pick a better Thai voice | The account has no Thai-only voice; try voices, then `npm run voice -- --force` | 0.5 h |
-| HTTPS for the phone | The mic needs HTTPS on a phone (for example a tunnel) | 0.5 h |
-| Stage rehearsal and backup video | Time the 3 minutes; record a backup in case the room Wi-Fi fails | 1.5 h |
-| Thai keywords | Speech to text makes mistakes in Thai; add the words people really say | 1 h |
-| More generated page parts | For example a date picker or an image card, in `web/lib/genui.js` and `scenes/generated.js` | 1-2 h |
-| Real U-topia payment behind Allow | Only after the demo; follow [Money safety](../AGENTS.md#money-safety) | 3 h |
+| Thai keywords | Speech to text makes mistakes in Thai; add the words people really say to `lib/router.js` | 1 h |
+| Real U-topia payment behind Allow | Only after the hackathon; follow [Money safety](../AGENTS.md#money-safety) | 3 h |
+
+Removed from the earlier list: the live agent smoke test (the agent is live),
+HTTPS for the phone (Vercel serves HTTPS), more block-page parts
+(pages are now written as free HTML, part 13), and the stage rehearsal (no live
+pitch since [2026-10-16](decisions.md#2026-10-16-judges-try-the-demo-alone)).

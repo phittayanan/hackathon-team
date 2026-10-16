@@ -1,6 +1,6 @@
 # Price test: summary
 
-This belongs to the dropped CryptoMate idea (see [decisions](../../decisions.md)); kept for reference.
+This belongs to the dropped CryptoMate idea (see [decisions](../../../decisions.md)); kept for reference.
 
 50 items, cheapest delivered to Bangkok: Thai shops versus shops abroad.
 Items: [items.md](items.md). Every row: [results.md](results.md).

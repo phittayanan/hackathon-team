@@ -1,5 +1,9 @@
 # Idea
 
+> **Being replanned (2026-10-16).** The pain point and the demo are being
+> replanned for the demo video. Until then this page is the plan of
+> 2026-10-15. What is built now: [build-parts.md](build-parts.md).
+
 **Agent OS** - you talk to an agent, and it answers with real UI instead of
 text, on one screen, never switching apps.
 Each decision is also written in [decisions.md](decisions.md).
