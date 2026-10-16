@@ -33,9 +33,12 @@ Copy this block for a new decision:
 - **Decision:** The `web_search` tool (Tavily) is removed. The live agent
   finds products through Shopify Global Catalog instead
   ([notes](../web/SHOPIFY-CATALOG.md)). There is no general web search.
-- **Why:** Not recorded. The change is commit `794e172`, merged in pull
-  request #38.
-- **Who decided:** not recorded
+- **Why:** osizk was building an agent that helps people shop, first with
+  Tavily for the shopping search (issue #32), then moved it to Shopify. The
+  general `web_search` tool (pull request #20) used the same Tavily code, so
+  it went out with it, not by a decision of its own. The change is commit
+  `794e172`, merged in pull request #38.
+- **Who decided:** osizk
 
 ## 2026-10-16: Pictures made ahead of time
 
