@@ -179,5 +179,10 @@ success. Known limits
 to measure include fixed secretary draft times, 1/5-minute snooze only, no
 general calendar writes, no real email, and catalog results not returned to
 the conversational model. Next, run the remaining development cases on this
-version, starting with D10/D11 to check the sending boundary and the refreshed
-state after an owner tap. Freeze changes before the held-out evaluation.
+version. D10/D11 live attempts were subsequently blocked before their first
+turn by the provider's `quota_exceeded` response. They have no behavioral
+scores. The browser regression independently verifies that an owner test-send
+preserves edited text and that a fresh tool call reports the new appointment;
+it uses the fake SDK and is not a replacement for live model evaluation.
+Resume those cases when provider credit is available, then freeze changes
+before the held-out evaluation.

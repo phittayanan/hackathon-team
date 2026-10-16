@@ -87,6 +87,15 @@ test('live: secretary tool returns the displayed email and distinguishes a propo
   expect(draft.proposedMeeting).toEqual({ eventId: 'client', start: '14:30', end: '15:00' });
   expect(draft.events.find((e) => e.id === 'client').start).toBe('14:00');
   expect(draft.sent).toBe(false);
+  const ownerText = 'สะดวกเป็น 14:30 ขอบคุณมากค่ะ';
+  await page.locator('.scene-secretary textarea').fill(ownerText);
+  await page.getByTestId('send-demo-reply').click();
+  const sent = JSON.parse(await tool(page, 'secretary_action', { action: 'today' }));
+  expect(sent.sent).toBe(true);
+  expect(sent.draft).toBe(ownerText);
+  expect(sent.proposedMeeting).toBeNull();
+  expect(sent.events.find((e) => e.id === 'client')).toMatchObject({ start: '14:30', end: '15:00' });
+  expect(sent.email).toEqual(email.email);
 });
 
 test('live: client tools open and act on scenes; payment can never be approved by the agent', async ({ page }) => {

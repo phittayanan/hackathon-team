@@ -177,6 +177,23 @@ as the existing home test helper does, before testing prefetch. The full suite
 was rerun successfully after that test synchronization change; no production
 prefetch behavior was changed to make the test pass.
 
+## Next sending cases blocked by provider credit
+
+D10 and D11 were attempted on the same grounded version after the above runs.
+Neither reached its first agent turn or received a conversation ID: the live
+session failed with `[quota_exceeded] You've run out of credits.` They are
+marked **blocked**, not passed or failed, in the repetition-1 worksheet.
+That worksheet now has two scored passes, two blocked cases, 16 pending cases
+and `passRate:null`. No retries were made after identifying the quota failure.
+
+The existing browser regression was extended to edit a draft, tap the owner's
+test-send button and call `secretary_action today` again. It verifies that
+`sent:true`, the owner's edited text is preserved, `proposedMeeting:null`,
+and the current client event is 14:30–15:00, while the original email remains
+unchanged. That targeted Playwright test passed (1/1), as did the syntax check.
+This check uses the fake SDK and validates app/tool data only; live model
+understanding of the post-send state is still untested on this version.
+
 ## Code validation
 
 At this revision of the evaluation work:
