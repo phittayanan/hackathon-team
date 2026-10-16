@@ -76,6 +76,28 @@ test('live: session request and SDK download start together', async ({ page }) =
   await page.locator('#mic').dispatchEvent('pointerup');
 });
 
+test('live: secretary tool returns the displayed email and distinguishes a proposal from the current appointment', async ({ page }) => {
+  await liveHome(page);
+  const email = JSON.parse(await tool(page, 'secretary_action', { action: 'email' }));
+  await expect(page.locator('.scene-secretary')).toContainText(email.email.subject);
+  await expect(page.locator('.scene-secretary')).toContainText(email.email.body);
+  expect(email.notices).toEqual([]);
+  expect(email.proposedMeeting).toBeNull();
+  const draft = JSON.parse(await tool(page, 'secretary_action', { action: 'draft' }));
+  expect(draft.proposedMeeting).toEqual({ eventId: 'client', start: '14:30', end: '15:00' });
+  expect(draft.events.find((e) => e.id === 'client').start).toBe('14:00');
+  expect(draft.sent).toBe(false);
+  const ownerText = 'สะดวกเป็น 14:30 ขอบคุณมากค่ะ';
+  await page.locator('.scene-secretary textarea').fill(ownerText);
+  await page.getByTestId('send-demo-reply').click();
+  const sent = JSON.parse(await tool(page, 'secretary_action', { action: 'today' }));
+  expect(sent.sent).toBe(true);
+  expect(sent.draft).toBe(ownerText);
+  expect(sent.proposedMeeting).toBeNull();
+  expect(sent.events.find((e) => e.id === 'client')).toMatchObject({ start: '14:30', end: '15:00' });
+  expect(sent.email).toEqual(email.email);
+});
+
 test('live: client tools open and act on scenes; payment can never be approved by the agent', async ({ page }) => {
   await liveHome(page);
   expect(await tool(page, 'open_scene', { scene: 'payment' })).toBe('opened payment');
@@ -212,6 +234,7 @@ test('live speed: the SDK loads at boot, the signed URL is fetched on the first 
   await expect.poll(() => sdkLoaded).toBe(true);
   expect(sessions).toBe(0); // page load alone spends no session
   await revealHome(page);
+  await expect(page.locator('body')).toHaveAttribute('data-ready', '1');
   await page.locator('#fallbackInput').focus();
   await expect.poll(() => sessions).toBe(1);
   await page.fill('#fallbackInput', 'this week is hectic');

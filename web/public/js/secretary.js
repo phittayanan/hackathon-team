@@ -6,13 +6,17 @@ export const NOTICE_TYPES = {
 };
 
 const seed = () => ({
+  email: {
+    subject: 'เตรียมประชุมวันนี้',
+    body: 'นัดเดิม 14:00–14:30 รบกวนส่งสไลด์และเตรียมหัวข้อประชุมภายใน 13:30 ด้วยค่ะ',
+  },
   events: [
     { id: 'team', title: 'ประชุมทีม', start: '13:00', end: '14:00' },
     { id: 'client', title: 'ประชุมลูกค้า', start: '14:00', end: '14:30' },
     { id: 'review', title: 'ทบทวนงานประจำวัน', start: '16:00', end: '16:30' },
   ],
   tasks: [{ id: 'budget', title: 'ตรวจงบประมาณ', due: '15:00', done: false }],
-  imported: false, quietEmails: 0, draft: null, sent: false, notices: [],
+  imported: false, quietEmails: 0, draft: null, proposedMeeting: null, sent: false, notices: [],
 });
 
 const minutes = (time) => {
@@ -94,16 +98,20 @@ export function createSecretary({ notify = async () => {}, onError = console.err
       task.done = Boolean(done); changed(); return true;
     },
     draftReply() {
-      if (conflicts(state.events, '14:30', '15:00', 'client').length) return false;
-      state.draft = 'สวัสดีค่ะ ช่วง 13:30 ติดประชุมทีมอยู่ ขอเสนอเป็น 14:30–15:00 แทน สะดวกไหมคะ ขอบคุณค่ะ';
+      const proposal = { eventId: 'client', start: '14:30', end: '15:00' };
+      if (conflicts(state.events, proposal.start, proposal.end, proposal.eventId).length) return false;
+      state.proposedMeeting = proposal;
+      state.draft = `สวัสดีค่ะ ช่วง 13:30 ติดประชุมทีมอยู่ ขอเสนอเป็น ${proposal.start}–${proposal.end} แทน สะดวกไหมคะ ขอบคุณค่ะ`;
       changed(); return true;
     },
     sendDraft(text) {
-      if (state.sent || !state.draft || typeof text !== 'string' || !text.trim() || text.length > 1500) return false;
-      if (conflicts(state.events, '14:30', '15:00', 'client').length) return false;
+      const proposal = state.proposedMeeting;
+      if (state.sent || !state.draft || !proposal || typeof text !== 'string' || !text.trim() || text.length > 1500) return false;
+      if (conflicts(state.events, proposal.start, proposal.end, proposal.eventId).length) return false;
       state.draft = text.trim(); state.sent = true;
-      const event = state.events.find((e) => e.id === 'client');
-      event.start = '14:30'; event.end = '15:00';
+      const event = state.events.find((e) => e.id === proposal.eventId);
+      event.start = proposal.start; event.end = proposal.end;
+      state.proposedMeeting = null;
       state.notices.filter((n) => n.type === 'meeting').forEach((n) => { cancel(n.id); n.status = 'dismissed'; });
       changed(); return true;
     },
