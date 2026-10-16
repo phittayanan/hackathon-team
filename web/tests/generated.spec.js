@@ -180,7 +180,7 @@ test('model page: a <script> and an onclick are removed; the page still shows an
   const evil = PAGES.beach
     .replace('</head>', '<script>window.__pwned = 1</script></head>')
     .replace('data-action="book"', 'data-action="book" onclick="window.__pwned = 2"')
-    .replace('<ol', '<img src="x" onerror="window.__pwned = 3"><a href="javascript:window.__pwned=4">x</a><ol');
+    .replace('<ol', '<img src="x" onerror="window.__pwned = 3"><a href="javascript:window.__pwned=4" style="display:block;padding:12px">อ่านต่อ</a><ol');
   await stubPage(page, evil);
   await home(page);
   await openWithBrief(page);
@@ -223,7 +223,7 @@ test('model page: a timeout, an error, an unfinished page or an urgent spec keep
 test('model page offline (no live agent): data-action works like saying its label; toggles and counters work', async ({ page }) => {
   await stubPage(page, PAGES.water);
   await home(page);
-  await openWithBrief(page);
+  await openWithBrief(page, { ...SPEC, title: TITLES.water });
   const host = page.locator('[data-testid=g-html]');
   await host.locator('[aria-label=เพิ่ม]').click();
   await host.locator('[aria-label=เพิ่ม]').click();
@@ -311,7 +311,7 @@ test('live: ticking an item or a toggle sends a silent [screen] update with the 
 
 // ---------- Layout check on the painted model page (page-check.js) ----------
 
-const PACK = { kind: 'pack', name: 'Pack', title: 'จัดกระเป๋าไปทะเล', accent: 'blue', blocks: [{ type: 'checklist', items: ['ครีมกันแดด', 'ชุดว่ายน้ำ', 'แว่นกันแดด'] }] };
+const PACK = { kind: 'pack', name: 'Pack', title: 'จัดกระเป๋าไปทะเล', accent: 'blue', proposals: [], blocks: [{ type: 'checklist', items: [{ text: 'ครีมกันแดด' }, { text: 'ชุดว่ายน้ำ' }, { text: 'แว่นกันแดด' }] }] };
 const packPage = (items, extraCss = '') => `<!doctype html><html><head><style>
   body{margin:0;padding:20px 16px 90px;background:#e8f4ff;color:#14273a}h1{font-size:32px;margin:0 0 16px}
   ul{list-style:none;padding:0;margin:0}li{min-height:48px;padding:12px;margin:0 0 8px;background:#fff;border-radius:14px}
@@ -339,7 +339,7 @@ test('layout check: a model page that overlaps and drops an item goes back to th
 });
 
 test('layout check: a clean model page stays, and a kept page reopens as the model page', async ({ page }) => {
-  const calls = await stubPage(page, packPage(PACK.blocks[0].items));
+  const calls = await stubPage(page, packPage(PACK.blocks[0].items.map((i) => i.text)));
   await home(page);
   await openWithBrief(page, PACK, 'Beach packing list');
   await expect(scene(page)).toHaveAttribute('data-view', 'html');

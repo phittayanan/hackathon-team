@@ -430,12 +430,12 @@ export default function mountGenerated(el, data, agent) {
       if (pending !== stop) return;
       const out = sanitizePage(raw);
       if (!pageOk(out)) throw new Error('page failed the checks');
+      pageRaw = raw; // kept before the check: a page kept in this one frame is checked again when it reopens
       shown = out.html;
       setView('html');
       await nextFrame();
       if (pending !== stop) return;
       if (!pageFits()) throw new Error('page failed the layout check');
-      pageRaw = raw;
     } catch (err) {
       if (pending !== stop) return;
       console.info('[page] block page kept:', err.message);
